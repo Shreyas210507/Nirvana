@@ -13,6 +13,7 @@ import {
   DataFreshness,
   CardSkeleton,
   ReportCard,
+  LanguageSelector,
 } from '@/components/ui';
 import {
   generateWardRisks,
@@ -26,6 +27,7 @@ import {
 import type { WardRisk, WeatherForecast } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
 import { useLocation } from '@/lib/location-context';
+import { useI18n } from '@/lib/i18n-context';
 import { LocationModal } from '@/components/ui/location-modal';
 import { fetchWeatherForecast } from '@/lib/weather-service';
 import { validateCoordinates, searchLocations } from '@/lib/location-service';
@@ -273,6 +275,7 @@ function SafetyChecklist({ hazard, level }: { hazard: string; level: string }) {
 // ============================================================================
 function CitizenDashboardContent() {
   const { user, isAuthenticated } = useAuth();
+  const { t, locale, tWeather, speak } = useI18n();
   const searchParams = useSearchParams();
   const {
     currentLocation,
@@ -460,19 +463,14 @@ function CitizenDashboardContent() {
     .slice(0, 3);
 
   const horizons = [
-    { value: 'now', label: 'Now' },
-    { value: '6h', label: '+6h' },
-    { value: '24h', label: '+24h' },
-    { value: '72h', label: '+72h' },
+    { value: 'now', label: t('dashboard.now') },
+    { value: '6h', label: t('dashboard.in6h') },
+    { value: '24h', label: t('dashboard.in24h') },
+    { value: '72h', label: t('dashboard.in72h') },
   ];
 
   const handleSpeak = (text: string) => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-IN';
-      utterance.rate = 0.9;
-      window.speechSynthesis.speak(utterance);
-    }
+    speak(text);
   };
 
   return (
@@ -480,7 +478,7 @@ function CitizenDashboardContent() {
       {/* Advisory Banner */}
       <div className="bg-teal/5 border-b border-teal/10 px-4 py-1.5">
         <p className="text-center text-xs text-teal font-medium">
-          ⓘ Advisory only — always follow official IMD / NDMA warnings
+          ⓘ {t('common.advisory')}
         </p>
       </div>
 
@@ -492,6 +490,7 @@ function CitizenDashboardContent() {
             <span className="font-bold text-ink font-display">Nirvana</span>
           </Link>
           <div className="flex items-center gap-2">
+            <LanguageSelector variant="dropdown" className="text-xs" />
             <button
               onClick={() =>
                 handleSpeak(
@@ -501,7 +500,7 @@ function CitizenDashboardContent() {
                 )
               }
               className="w-8 h-8 rounded-full bg-teal/10 flex items-center justify-center text-sm hover:bg-teal/20 transition-colors"
-              title="Listen to risk and weather summary"
+              title={t('common.listen')}
             >
               🔊
             </button>
@@ -509,7 +508,7 @@ function CitizenDashboardContent() {
               <Link
                 href="/settings"
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-sand-200 hover:bg-sand-100 transition-colors text-xs font-semibold text-ink shadow-xs"
-                title="Account Settings"
+                title={t('nav.settings')}
               >
                 <div className="w-5 h-5 rounded-full bg-teal text-white flex items-center justify-center text-[10px] font-bold">
                   {user.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
@@ -523,13 +522,13 @@ function CitizenDashboardContent() {
                 href="/login"
                 className="px-3 py-1 rounded-full bg-teal text-white text-xs font-semibold hover:bg-teal-600 transition-colors shadow-xs"
               >
-                Sign In
+                {t('nav.signIn')}
               </Link>
             )}
             <Link
               href="/settings"
               className="w-8 h-8 rounded-full bg-sand-100 flex items-center justify-center text-sm hover:bg-sand-200 transition-colors"
-              title="Settings"
+              title={t('nav.settings')}
             >
               ⚙️
             </Link>
@@ -657,7 +656,7 @@ function CitizenDashboardContent() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-teal">
-                  Live Conditions
+                  {t('weather.current')}
                 </span>
                 <div className="flex items-baseline gap-2 mt-1">
                   <span className="text-4xl font-extrabold text-ink font-display">
@@ -668,7 +667,7 @@ function CitizenDashboardContent() {
                   </span>
                 </div>
                 <p className="text-sm text-ink-600 font-medium mt-0.5">
-                  {forecast.current.weatherDescription}
+                  {tWeather(forecast.current.weatherCode).emoji} {tWeather(forecast.current.weatherCode).description}
                 </p>
               </div>
 
@@ -687,14 +686,14 @@ function CitizenDashboardContent() {
               <div className="flex items-center gap-2 p-2 rounded-xl bg-cream-50/60">
                 <Droplets className="w-4 h-4 text-teal shrink-0" />
                 <div>
-                  <p className="text-[10px] text-ink-400">Humidity</p>
+                  <p className="text-[10px] text-ink-400">{t('weather.humidity')}</p>
                   <p className="text-xs font-semibold text-ink">{forecast.current.humidity}%</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 p-2 rounded-xl bg-cream-50/60">
                 <Wind className="w-4 h-4 text-teal shrink-0" />
                 <div>
-                  <p className="text-[10px] text-ink-400">Wind</p>
+                  <p className="text-[10px] text-ink-400">{t('weather.wind')}</p>
                   <p className="text-xs font-semibold text-ink">
                     {forecast.current.windSpeed.toFixed(0)} km/h
                   </p>
@@ -703,7 +702,7 @@ function CitizenDashboardContent() {
               <div className="flex items-center gap-2 p-2 rounded-xl bg-cream-50/60">
                 <Thermometer className="w-4 h-4 text-saffron shrink-0" />
                 <div>
-                  <p className="text-[10px] text-ink-400">Rain Rate</p>
+                  <p className="text-[10px] text-ink-400">{t('weather.rain')}</p>
                   <p className="text-xs font-semibold text-ink">
                     {forecast.current.rainfall.toFixed(1)} mm
                   </p>
@@ -735,7 +734,7 @@ function CitizenDashboardContent() {
           className="bg-white rounded-3xl border border-sand-200 p-5 shadow-soft"
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-ink">Your Risk Level</h2>
+            <h2 className="font-semibold text-ink">{t('dashboard.riskLevel')}</h2>
             <TimelineChips
               horizons={horizons}
               selected={selectedHorizon}
@@ -763,7 +762,7 @@ function CitizenDashboardContent() {
                 hazard="flood"
                 size="lg"
               />
-              <p className="text-xs text-ink-400 mt-2">Flood Risk</p>
+              <p className="text-xs text-ink-400 mt-2">{t('dashboard.floodRisk')}</p>
               {currentRisk?.flood.depthBucket && (
                 <span className="text-xs text-ink-300 mt-0.5">
                   Est. depth: {currentRisk.flood.depthBucket}
@@ -783,7 +782,7 @@ function CitizenDashboardContent() {
                 hazard="heat"
                 size="lg"
               />
-              <p className="text-xs text-ink-400 mt-2">Heat Risk</p>
+              <p className="text-xs text-ink-400 mt-2">{t('dashboard.heatRisk')}</p>
               {forecast && (
                 <span className="text-xs text-ink-300 mt-0.5">
                   Feels like {forecast.current.heatIndex.toFixed(0)}°C
@@ -818,13 +817,13 @@ function CitizenDashboardContent() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold text-ink text-sm flex items-center gap-2">
-              <span>🛡️</span> Nearest Shelter
+              <span>🛡️</span> {t('dashboard.nearestShelters')}
             </h3>
             <Link
               href="/shelters"
               className="text-xs text-teal font-medium hover:text-teal-600 transition-colors"
             >
-              View all →
+              {t('common.all')} →
             </Link>
           </div>
           <ShelterCard shelter={nearbyShelters[0]} />
@@ -1057,11 +1056,11 @@ function CitizenDashboardContent() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-sand-200 z-40 no-print">
         <div className="max-w-lg mx-auto flex items-center justify-around py-2 px-2">
           {[
-            { href: '/dashboard', icon: '🏠', label: 'Home', active: true },
-            { href: '/map', icon: '🗺️', label: 'Map', active: false },
-            { href: '/alerts', icon: '🔔', label: 'Alerts', active: false, badge: activeAlerts.length },
-            { href: '/guide', icon: '📖', label: 'Guide', active: false },
-            { href: '/settings', icon: '👤', label: 'Profile', active: false },
+            { href: '/dashboard', icon: '🏠', label: t('dashboard.title'), active: true },
+            { href: '/map', icon: '🗺️', label: t('nav.map'), active: false },
+            { href: '/alerts', icon: '🔔', label: t('nav.alerts'), active: false, badge: activeAlerts.length },
+            { href: '/guide', icon: '📖', label: t('nav.guide'), active: false },
+            { href: '/settings', icon: '👤', label: t('nav.settings'), active: false },
           ].map((item) => (
             <Link
               key={item.href}

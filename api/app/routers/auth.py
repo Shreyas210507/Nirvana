@@ -50,6 +50,7 @@ class RegisterRequest(BaseModel):
     role: Optional[str] = "citizen"
     ward_id: Optional[str] = "w-001"
     terms_agreed: bool = True
+    language: Optional[str] = "en"
 
 
 class LoginRequest(BaseModel):
@@ -68,6 +69,7 @@ class UserResponse(BaseModel):
     is_verified: bool = True
     created_at: str
     last_login_at: Optional[str] = None
+    language: str = "en"
 
 
 class AuthResponse(BaseModel):
@@ -92,6 +94,7 @@ class UpdateProfileRequest(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
     ward_id: Optional[str] = None
+    language: Optional[str] = None
 
 
 class RefreshTokenRequest(BaseModel):
@@ -109,6 +112,7 @@ def format_user_response(user_dict: Dict[str, Any]) -> UserResponse:
         is_verified=bool(user_dict.get("is_verified", 1)),
         created_at=user_dict.get("created_at", ""),
         last_login_at=user_dict.get("last_login_at"),
+        language=user_dict.get("language") or "en",
     )
 
 
@@ -171,6 +175,7 @@ async def register(body: RegisterRequest, response: Response):
         role=assigned_role,
         ward_id=body.ward_id or "w-001",
         is_verified=True,
+        language=body.language or "en",
     )
 
     # 8. Generate JWT tokens
@@ -397,5 +402,6 @@ async def update_profile(
         full_name=body.full_name,
         phone=body.phone,
         ward_id=body.ward_id,
+        language=body.language,
     )
     return format_user_response(updated)

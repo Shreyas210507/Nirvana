@@ -13,6 +13,7 @@ export interface AuthUser {
   is_verified: boolean;
   created_at: string;
   last_login_at?: string | null;
+  language?: string;
 }
 
 export interface AuthTokens {
@@ -35,6 +36,7 @@ export interface RegisterPayload {
   role?: string;
   ward_id?: string;
   terms_agreed: boolean;
+  language?: string;
 }
 
 export interface LoginPayload {
@@ -60,6 +62,7 @@ export interface UpdateProfilePayload {
   full_name?: string;
   phone?: string;
   ward_id?: string;
+  language?: string;
 }
 
 // Storage keys

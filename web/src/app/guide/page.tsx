@@ -4,19 +4,18 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { safetyGuidance, emergencyContacts } from '@/lib/mock-data';
+import { useI18n } from '@/lib/i18n-context';
+import { LanguageSelector } from '@/components/ui';
 
 function GuidanceCard({ guide, index }: { guide: typeof safetyGuidance[0]; index: number }) {
+  const { t, speak } = useI18n();
   const [expanded, setExpanded] = useState(index === 0);
   const phaseIcons = { before: '🔔', during: '⚡', after: '🔄' };
   const phaseColors = { before: '#0D9488', during: '#F97316', after: '#10B981' };
 
   const handleSpeak = () => {
-    if ('speechSynthesis' in window) {
-      const text = guide.steps.map(s => s.text).join('. ');
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'en-IN'; u.rate = 0.85;
-      speechSynthesis.speak(u);
-    }
+    const text = guide.steps.map(s => s.text).join('. ');
+    speak(text);
   };
 
   return (
@@ -141,6 +140,7 @@ function FirstAidCard({ title, emoji, steps }: { title: string; emoji: string; s
 }
 
 export default function SafetyGuidePage() {
+  const { t } = useI18n();
   const [hazardFilter, setHazardFilter] = useState<'flood' | 'heat'>('flood');
 
   const filteredGuides = safetyGuidance.filter(g => g.hazard === hazardFilter);
@@ -151,16 +151,21 @@ export default function SafetyGuidePage() {
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/dashboard" className="w-8 h-8 rounded-full bg-sand-100 flex items-center justify-center hover:bg-sand-200 transition-colors">←</Link>
-            <h1 className="font-bold text-ink font-display">Safety Guide</h1>
+            <h1 className="font-bold text-ink font-display">{t('guide.title')}</h1>
           </div>
-          <button
-            onClick={() => {
-              if ('speechSynthesis' in window) speechSynthesis.cancel();
-            }}
-            className="text-xs text-ink-400 hover:text-ink-600 transition-colors"
-          >
-            🔇 Stop audio
-          </button>
+          <div className="flex items-center gap-2">
+            <LanguageSelector variant="dropdown" className="text-xs" />
+            <button
+              onClick={() => {
+                if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                  window.speechSynthesis.cancel();
+                }
+              }}
+              className="text-xs text-ink-400 hover:text-ink-600 transition-colors"
+            >
+              🔇
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -173,7 +178,7 @@ export default function SafetyGuidePage() {
               hazardFilter === 'flood' ? 'bg-teal text-white shadow-glow-teal' : 'text-ink-400'
             }`}
           >
-            🌊 Flood Safety
+            🌊 {t('guide.floodSafety')}
           </button>
           <button
             onClick={() => setHazardFilter('heat')}
@@ -181,7 +186,7 @@ export default function SafetyGuidePage() {
               hazardFilter === 'heat' ? 'bg-saffron text-white shadow-glow-saffron' : 'text-ink-400'
             }`}
           >
-            🌡️ Heat Safety
+            🌡️ {t('guide.heatSafety')}
           </button>
         </div>
 
@@ -295,11 +300,11 @@ export default function SafetyGuidePage() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-sand-200 z-40">
         <div className="max-w-lg mx-auto flex items-center justify-around py-2 px-2">
           {[
-            { href: '/dashboard', icon: '🏠', label: 'Home', active: false },
-            { href: '/map', icon: '🗺️', label: 'Map', active: false },
-            { href: '/alerts', icon: '🔔', label: 'Alerts', active: false },
-            { href: '/guide', icon: '📖', label: 'Guide', active: true },
-            { href: '/settings', icon: '👤', label: 'Profile', active: false },
+            { href: '/dashboard', icon: '🏠', label: t('dashboard.title'), active: false },
+            { href: '/map', icon: '🗺️', label: t('nav.map'), active: false },
+            { href: '/alerts', icon: '🔔', label: t('nav.alerts'), active: false },
+            { href: '/guide', icon: '📖', label: t('nav.guide'), active: true },
+            { href: '/settings', icon: '👤', label: t('nav.settings'), active: false },
           ].map(item => (
             <Link key={item.href} href={item.href} className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-colors ${item.active ? 'text-teal' : 'text-ink-400'}`}>
               <span className="text-xl">{item.icon}</span>

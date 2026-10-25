@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { RiskBadge, TimelineChips, DataFreshness, ShelterCard } from '@/components/ui';
+import { RiskBadge, TimelineChips, DataFreshness, ShelterCard, LanguageSelector } from '@/components/ui';
+import { useI18n } from '@/lib/i18n-context';
 import { generateWardRisks, hyderabadWards, hyderabadShelters, mockReports } from '@/lib/mock-data';
 import { getRiskColor } from '@/lib/utils';
 import type { WardRisk } from '@/lib/types';
@@ -293,21 +294,22 @@ export default function MapPage() {
     });
   };
 
+  const { t } = useI18n();
   const selectedWardData = selectedWard ? wardRisks.find(w => w.wardId === selectedWard) : null;
 
   const horizons = [
-    { value: 'now', label: 'Now' },
-    { value: '6h', label: '+6h' },
-    { value: '24h', label: '+24h' },
-    { value: '72h', label: '+72h' },
+    { value: 'now', label: t('dashboard.now') },
+    { value: '6h', label: t('dashboard.in6h') },
+    { value: '24h', label: t('dashboard.in24h') },
+    { value: '72h', label: t('dashboard.in72h') },
   ];
 
   const layerOptions = [
-    { id: 'flood', label: 'Flood Risk', icon: '🌊', color: '#0D9488' },
-    { id: 'heat', label: 'Heat Risk', icon: '🌡️', color: '#D97706' },
-    { id: 'shelters', label: 'Shelters', icon: '🛡️', color: '#10B981' },
+    { id: 'flood', label: t('dashboard.floodRisk'), icon: '🌊', color: '#0D9488' },
+    { id: 'heat', label: t('dashboard.heatRisk'), icon: '🌡️', color: '#D97706' },
+    { id: 'shelters', label: t('nav.shelters'), icon: '🛡️', color: '#10B981' },
     { id: 'drains', label: 'Drainage', icon: '🚰', color: '#475569' },
-    { id: 'reports', label: 'Reports', icon: '📋', color: '#F97316' },
+    { id: 'reports', label: t('nav.report'), icon: '📋', color: '#F97316' },
     { id: 'elevation', label: 'Elevation', icon: '⛰️', color: '#64748B' },
   ];
 
@@ -322,10 +324,11 @@ export default function MapPage() {
               <span className="font-bold text-ink font-display">Nirvana</span>
             </Link>
             <span className="text-ink-200">|</span>
-            <h1 className="text-sm font-semibold text-ink">Risk Map</h1>
+            <h1 className="text-sm font-semibold text-ink">{t('nav.map')}</h1>
           </div>
           
           <div className="flex items-center gap-3">
+            <LanguageSelector variant="dropdown" className="text-xs" />
             {/* Hazard toggle */}
             <div className="inline-flex bg-sand-100 rounded-full p-0.5">
               <button
@@ -334,7 +337,7 @@ export default function MapPage() {
                   hazardView === 'flood' ? 'bg-teal text-white' : 'text-ink-400 hover:text-ink-600'
                 }`}
               >
-                🌊 Flood
+                🌊 {t('dashboard.floodRisk')}
               </button>
               <button
                 onClick={() => { setHazardView('heat'); setActiveLayers(prev => { const n = new Set(prev); n.delete('flood'); n.add('heat'); return n; }); }}
@@ -342,7 +345,7 @@ export default function MapPage() {
                   hazardView === 'heat' ? 'bg-saffron text-white' : 'text-ink-400 hover:text-ink-600'
                 }`}
               >
-                🌡️ Heat
+                🌡️ {t('dashboard.heatRisk')}
               </button>
             </div>
             

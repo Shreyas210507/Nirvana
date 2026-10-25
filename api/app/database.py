@@ -40,9 +40,16 @@ def init_db():
         ward_id TEXT DEFAULT 'w-001',
         is_verified INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
-        last_login_at TEXT
+        last_login_at TEXT,
+        language TEXT NOT NULL DEFAULT 'en'
     );
     """)
+
+    # Auto-migrate language column if users table was created previously without it
+    cursor.execute("PRAGMA table_info(users);")
+    columns = [row["name"] for row in cursor.fetchall()]
+    if "language" not in columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN language TEXT NOT NULL DEFAULT 'en';")
 
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
 
@@ -80,16 +87,17 @@ def init_db():
 # ============================================================================
 def create_user(user_id: str, email: str, hashed_password: str, full_name: str,
                 phone: Optional[str] = None, role: str = "citizen",
-                ward_id: Optional[str] = "w-001", is_verified: bool = True) -> Dict[str, Any]:
+                ward_id: Optional[str] = "w-001", is_verified: bool = True,
+                language: str = "en") -> Dict[str, Any]:
     """Insert a new user into the database."""
     conn = get_db()
     cursor = conn.cursor()
     now_iso = datetime.now(timezone.utc).isoformat()
     cursor.execute("""
-    INSERT INTO users (id, email, hashed_password, full_name, phone, role, ward_id, is_verified, created_at, last_login_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (id, email, hashed_password, full_name, phone, role, ward_id, is_verified, created_at, last_login_at, language)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (user_id, email.lower().strip(), hashed_password, full_name.strip(),
-          phone, role, ward_id or "w-001", 1 if is_verified else 0, now_iso, now_iso))
+          phone, role, ward_id or "w-001", 1 if is_verified else 0, now_iso, now_iso, language or "en"))
     conn.commit()
     conn.close()
     return get_user_by_id(user_id)
@@ -141,7 +149,8 @@ def update_user_password(user_id: str, new_hashed_password: str) -> bool:
 
 
 def update_user_profile(user_id: str, full_name: Optional[str] = None,
-                        phone: Optional[str] = None, ward_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+                        phone: Optional[str] = None, ward_id: Optional[str] = None,
+                        language: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Update a user's profile details."""
     conn = get_db()
     cursor = conn.cursor()
@@ -156,6 +165,9 @@ def update_user_profile(user_id: str, full_name: Optional[str] = None,
     if ward_id is not None:
         fields.append("ward_id = ?")
         values.append(ward_id.strip())
+    if language is not None:
+        fields.append("language = ?")
+        values.append(language.strip().lower())
 
     if not fields:
         conn.close()

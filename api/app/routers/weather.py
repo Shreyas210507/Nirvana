@@ -268,11 +268,13 @@ async def get_current_weather(
 
 @router.get("/geocode")
 async def geocode_location(
-    query: str = Query(..., min_length=2, description="Place or city name to search")
+    query: str = Query(..., min_length=2, description="Place or city name to search"),
+    language: Optional[str] = Query("en", description="Preferred language for results"),
 ):
     """Proxy geocoding query to Open-Meteo Geocoding API."""
     url = f"https://geocoding-api.open-meteo.com/v1/search"
-    params = {"name": query.strip(), "count": 6, "language": "en", "format": "json"}
+    lang_code = (language or "en").strip().lower()
+    params = {"name": query.strip(), "count": 6, "language": lang_code, "format": "json"}
 
     try:
         client = get_async_client()

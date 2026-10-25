@@ -5,13 +5,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LanguageSelector } from '@/components/ui';
-import { languages, hyderabadWards } from '@/lib/mock-data';
+import { hyderabadWards } from '@/lib/mock-data';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n-context';
 import { LogOut, LogIn, UserPlus, Edit3, Check, X, Shield, User as UserIcon } from 'lucide-react';
 
 export default function SettingsPage() {
   const router = useRouter();
   const { user, isAuthenticated, logout, updateProfile } = useAuth();
+  const { t, locale, setLocale, languages } = useI18n();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
@@ -35,21 +37,34 @@ export default function SettingsPage() {
         full_name: editName.trim(),
         phone: editPhone.trim() || undefined,
         ward_id: editWard,
+        language: locale,
       });
       setSaveSuccess(true);
       setTimeout(() => {
         setSaveSuccess(false);
         setIsEditingProfile(false);
       }, 1200);
-    } catch (err) {
-      alert('Failed to update profile.');
+    } catch {
+      alert(t('common.error'));
     } finally {
       setIsSaving(false);
     }
   };
-  const [selectedLang, setSelectedLang] = useState('en');
+
+  const handleLanguageChange = async (newLocale: string) => {
+    setLocale(newLocale as any);
+    if (isAuthenticated && user) {
+      try {
+        await updateProfile({ language: newLocale });
+      } catch (err) {
+        console.warn('Could not persist language to user profile:', err);
+      }
+    }
+  };
+
   const [fontSize, setFontSize] = useState('normal');
   const [simpleMode, setSimpleMode] = useState(false);
+  const [showAllLangs, setShowAllLangs] = useState(false);
   const [channels, setChannels] = useState({ in_app: true, push: true, sms: true, whatsapp: false, voice: false });
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
 
@@ -62,7 +77,7 @@ export default function SettingsPage() {
       <nav className="sticky top-0 z-50 bg-cream-100/90 backdrop-blur-xl border-b border-sand-200/50 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <Link href="/dashboard" className="w-8 h-8 rounded-full bg-sand-100 flex items-center justify-center hover:bg-sand-200 transition-colors">←</Link>
-          <h1 className="font-bold text-ink font-display">Profile & Settings</h1>
+          <h1 className="font-bold text-ink font-display">{t('settings.title')}</h1>
         </div>
       </nav>
 
@@ -250,16 +265,22 @@ export default function SettingsPage() {
         {/* Language */}
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           className="bg-white rounded-2xl border border-sand-200 p-5 shadow-soft">
-          <h3 className="font-semibold text-ink text-sm mb-3 flex items-center gap-2">🗣️ Language</h3>
+          <h3 className="font-semibold text-ink text-sm mb-1 flex items-center gap-2">🗣️ {t('settings.languageTitle')}</h3>
+          <p className="text-xs text-ink-400 mb-3">{t('settings.languageDesc')}</p>
           <LanguageSelector
-            languages={languages.slice(0, 5)}
-            selected={selectedLang}
-            onChange={setSelectedLang}
+            languages={showAllLangs ? languages : languages.slice(0, 5)}
+            selected={locale}
+            onChange={handleLanguageChange}
             variant="chips"
           />
-          <button className="mt-3 text-xs text-teal font-medium hover:text-teal-600 transition-colors">
-            Show all {languages.length} languages →
-          </button>
+          {!showAllLangs && (
+            <button
+              onClick={() => setShowAllLangs(true)}
+              className="mt-3 text-xs text-teal font-medium hover:text-teal-600 transition-colors"
+            >
+              {t('settings.showAllLanguages')}
+            </button>
+          )}
         </motion.div>
 
         {/* Alert Channels */}

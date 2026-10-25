@@ -6,11 +6,14 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Check, X, Shield, User, AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n-context';
+import { LanguageSelector } from '@/components/ui';
 import { hyderabadWards } from '@/lib/mock-data';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register, clearError, error: authError } = useAuth();
+  const { t, locale } = useI18n();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -96,6 +99,7 @@ export default function RegisterPage() {
         password,
         confirm_password: confirmPassword,
         terms_agreed: termsAgreed,
+        language: locale,
       });
 
       setSuccessMessage(`Account created successfully for ${createdUser.full_name}! Redirecting...`);
@@ -121,7 +125,7 @@ export default function RegisterPage() {
       {/* Top Advisory Banner */}
       <div className="bg-teal-50 border-b border-teal-100 px-4 py-2">
         <p className="text-center text-xs text-teal-800 font-medium max-w-4xl mx-auto flex items-center justify-center gap-1.5">
-          <span className="text-teal-600 font-bold">ⓘ</span> Nirvana Advisory Registration. Create an account to receive hyperlocal flood & heat resilience warnings.
+          <span className="text-teal-600 font-bold">ⓘ</span> {t('common.advisory')}
         </p>
       </div>
 
@@ -135,17 +139,20 @@ export default function RegisterPage() {
         >
           {/* Header */}
           <div className="text-center">
-            <Link href="/" className="inline-flex items-center gap-2.5 mb-3 group">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-glow-teal group-hover:scale-105 transition-transform duration-200">
-                <span className="text-white text-xl">🏘️</span>
-              </div>
-              <span className="font-bold text-2xl text-ink font-display tracking-tight">Nirvana</span>
-            </Link>
+            <div className="flex items-center justify-between mb-2">
+              <Link href="/" className="inline-flex items-center gap-2.5 group">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-glow-teal group-hover:scale-105 transition-transform duration-200">
+                  <span className="text-white text-xl">🏘️</span>
+                </div>
+                <span className="font-bold text-2xl text-ink font-display tracking-tight">Nirvana</span>
+              </Link>
+              <LanguageSelector variant="dropdown" className="text-xs" />
+            </div>
             <h1 className="text-3xl font-extrabold text-ink font-display tracking-tight">
-              Create Your Account
+              {t('auth.registerTitle')}
             </h1>
             <p className="mt-1 text-sm text-ink-400">
-              Personalized climate intelligence and early warning alerts for your ward.
+              {t('auth.registerSubtitle')}
             </p>
           </div>
 

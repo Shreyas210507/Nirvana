@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { I18nProvider } from "@/lib/i18n-context";
 import { LocationProvider } from "@/lib/location-context";
 
 export const metadata: Metadata = {
@@ -24,9 +25,11 @@ export default function RootLayout({
       </head>
       <body className="bg-cream-100 text-ink antialiased">
         <AuthProvider>
-          <LocationProvider>
-            {children}
-          </LocationProvider>
+          <I18nProvider>
+            <LocationProvider>
+              {children}
+            </LocationProvider>
+          </I18nProvider>
         </AuthProvider>
       </body>
     </html>

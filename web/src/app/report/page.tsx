@@ -3,8 +3,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useI18n } from '@/lib/i18n-context';
+import { LanguageSelector } from '@/components/ui';
 
 export default function ReportPage() {
+  const { t } = useI18n();
   const [reportType, setReportType] = useState('');
   const [severity, setSeverity] = useState('');
   const [description, setDescription] = useState('');
@@ -12,17 +15,17 @@ export default function ReportPage() {
   const [submitted, setSubmitted] = useState(false);
 
   const reportTypes = [
-    { id: 'waterlogging', icon: '🌊', label: 'Waterlogging', desc: 'Standing water on roads or in colonies' },
-    { id: 'blocked_drain', icon: '🚧', label: 'Blocked Drain', desc: 'Drain clogged with debris or garbage' },
-    { id: 'heat_stress', icon: '🥵', label: 'Heat Stress', desc: 'People affected by extreme heat' },
-    { id: 'power_cut', icon: '⚡', label: 'Power Cut', desc: 'Electricity failure in the area' },
-    { id: 'other', icon: '📋', label: 'Other', desc: 'Any other weather-related issue' },
+    { id: 'waterlogging', icon: '🌊', label: t('report.waterlogging'), desc: 'Standing water on roads or in colonies' },
+    { id: 'blocked_drain', icon: '🚧', label: t('report.blockedDrain'), desc: 'Drain clogged with debris or garbage' },
+    { id: 'heat_stress', icon: '🥵', label: t('report.heatStress'), desc: 'People affected by extreme heat' },
+    { id: 'power_cut', icon: '⚡', label: t('report.powerCut'), desc: 'Electricity failure in the area' },
+    { id: 'other', icon: '📋', label: t('report.otherHazard'), desc: 'Any other weather-related issue' },
   ];
 
   const severityLevels = [
-    { id: 'low', label: 'Low', desc: 'Minor inconvenience', color: '#10B981' },
-    { id: 'medium', label: 'Medium', desc: 'Significant disruption', color: '#F59E0B' },
-    { id: 'high', label: 'High', desc: 'Dangerous situation', color: '#EF4444' },
+    { id: 'low', label: t('report.severityLow'), desc: 'Minor inconvenience', color: '#10B981' },
+    { id: 'medium', label: t('report.severityMedium'), desc: 'Significant disruption', color: '#F59E0B' },
+    { id: 'high', label: t('report.severityHigh'), desc: 'Dangerous situation', color: '#EF4444' },
   ];
 
   const handleSubmit = () => {
@@ -45,22 +48,22 @@ export default function ReportPage() {
           >
             <span className="text-4xl">✅</span>
           </motion.div>
-          <h2 className="text-xl font-bold text-ink mb-2 font-display">Report Submitted!</h2>
+          <h2 className="text-xl font-bold text-ink mb-2 font-display">{t('report.successTitle')}</h2>
           <p className="text-sm text-ink-400 mb-6">
-            Thank you for helping your community. Your report will be reviewed and nearby residents can confirm it.
+            {t('report.successDesc')}
           </p>
           <div className="space-y-2">
             <Link
               href="/dashboard"
               className="block w-full px-4 py-3 rounded-xl bg-teal text-white text-sm font-semibold text-center hover:bg-teal-600 transition-colors"
             >
-              Back to Dashboard
+              {t('common.returnHome')}
             </Link>
             <button
               onClick={() => { setSubmitted(false); setStep(1); setReportType(''); setSeverity(''); setDescription(''); }}
               className="block w-full px-4 py-3 rounded-xl bg-sand-100 text-ink-500 text-sm font-medium text-center hover:bg-sand-200 transition-colors"
             >
-              Submit Another Report
+              {t('report.submit')}
             </button>
           </div>
         </motion.div>
@@ -74,9 +77,9 @@ export default function ReportPage() {
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/dashboard" className="w-8 h-8 rounded-full bg-sand-100 flex items-center justify-center hover:bg-sand-200 transition-colors">←</Link>
-            <h1 className="font-bold text-ink font-display">Report an Issue</h1>
+            <h1 className="font-bold text-ink font-display">{t('report.title')}</h1>
           </div>
-          <span className="text-xs text-ink-400">Step {step}/3</span>
+          <LanguageSelector variant="dropdown" className="text-xs" />
         </div>
       </nav>
 

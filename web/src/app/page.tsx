@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useLocation } from '@/lib/location-context';
 import { searchLocations } from '@/lib/location-service';
+import { useI18n } from '@/lib/i18n-context';
+import { LanguageSelector } from '@/components/ui';
 import { LogOut, User as UserIcon, Shield, LogIn, ChevronDown } from 'lucide-react';
 
 // ============================================================================
@@ -133,21 +135,11 @@ export default function LandingPage() {
   const { user, isAuthenticated, logout, isMunicipal } = useAuth();
   const router = useRouter();
   const { requestDeviceLocation, isLocating } = useLocation();
+  const { t, locale, setLocale, languages } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-
-  const languageChips = [
-    { code: 'en', label: 'English' },
-    { code: 'hi', label: 'हिन्दी' },
-    { code: 'te', label: 'తెలుగు' },
-    { code: 'ta', label: 'தமிழ்' },
-    { code: 'kn', label: 'ಕನ್ನಡ' },
-    { code: 'mr', label: 'मराठी' },
-    { code: 'ur', label: 'اردو' },
-  ];
 
   const handleUseLocation = async () => {
     setGeoError(null);
@@ -199,7 +191,7 @@ export default function LandingPage() {
       {/* Advisory Banner */}
       <div className="bg-teal-50 border-b border-teal-100 px-4 py-2">
         <p className="text-center text-xs text-teal-800 font-medium max-w-4xl mx-auto flex items-center justify-center gap-1.5">
-          <span className="text-teal-600 font-bold">ⓘ</span> Nirvana is an advisory platform. Always follow official IMD / NDMA / state disaster authority warnings.
+          <span className="text-teal-600 font-bold">ⓘ</span> {t('common.advisory')}
         </p>
       </div>
 
@@ -214,27 +206,19 @@ export default function LandingPage() {
               <span className="font-bold text-xl text-ink font-display tracking-tight">Nirvana</span>
             </div>
             <div className="hidden md:flex items-center gap-6">
-              <a href="#features" className="text-sm font-medium text-ink-500 hover:text-teal-600 transition-colors animated-underline">Features</a>
-              <a href="#how-it-works" className="text-sm font-medium text-ink-500 hover:text-teal-600 transition-colors animated-underline">How It Works</a>
-              <a href="#personas" className="text-sm font-medium text-ink-500 hover:text-teal-600 transition-colors animated-underline">Who It&apos;s For</a>
-              <a href="#data" className="text-sm font-medium text-ink-500 hover:text-teal-600 transition-colors animated-underline">Data Sources</a>
+              <a href="#features" className="text-sm font-medium text-ink-500 hover:text-teal-600 transition-colors animated-underline">{t('nav.features')}</a>
+              <a href="#how-it-works" className="text-sm font-medium text-ink-500 hover:text-teal-600 transition-colors animated-underline">{t('nav.howItWorks')}</a>
+              <a href="#personas" className="text-sm font-medium text-ink-500 hover:text-teal-600 transition-colors animated-underline">{t('nav.whoItsFor')}</a>
+              <a href="#data" className="text-sm font-medium text-ink-500 hover:text-teal-600 transition-colors animated-underline">{t('nav.dataSources')}</a>
               <Link
                 href="/dashboard/municipal"
                 className="text-sm font-medium text-ink-500 hover:text-teal-600 transition-colors animated-underline"
               >
-                Municipal Portal
+                {t('nav.municipalPortal')}
               </Link>
             </div>
             <div className="flex items-center gap-3">
-              <select
-                value={selectedLanguage}
-                onChange={e => setSelectedLanguage(e.target.value)}
-                className="text-sm bg-white border border-sand-200 rounded-xl px-3 py-1.5 text-ink-600 font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-xs"
-              >
-                {languageChips.map(l => (
-                  <option key={l.code} value={l.code}>{l.label}</option>
-                ))}
-              </select>
+              <LanguageSelector variant="dropdown" className="text-xs sm:text-sm" />
 
               {isAuthenticated && user ? (
                 <div className="relative">
@@ -264,14 +248,14 @@ export default function LandingPage() {
                         className="flex items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-cream-100 font-medium"
                       >
                         {isMunicipal ? <Shield className="w-3.5 h-3.5 text-amber-600" /> : <UserIcon className="w-3.5 h-3.5 text-teal" />}
-                        <span>{isMunicipal ? 'Command Dashboard' : 'Citizen Dashboard'}</span>
+                        <span>{isMunicipal ? t('nav.municipalPortal') : t('nav.citizenDashboard')}</span>
                       </Link>
                       <Link
                         href="/settings"
                         onClick={() => setUserMenuOpen(false)}
                         className="flex items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-cream-100 font-medium"
                       >
-                        <span>⚙️ Profile & Settings</span>
+                        <span>⚙️ {t('nav.settings')}</span>
                       </Link>
                       <button
                         onClick={() => {
@@ -281,7 +265,7 @@ export default function LandingPage() {
                         className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 font-medium border-t border-sand-100"
                       >
                         <LogOut className="w-3.5 h-3.5" />
-                        <span>Sign Out</span>
+                        <span>{t('nav.signOut')}</span>
                       </button>
                     </div>
                   )}
@@ -293,13 +277,13 @@ export default function LandingPage() {
                     className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-sand-200 bg-white hover:bg-cream-50 text-xs font-semibold text-ink transition-colors shadow-xs"
                   >
                     <LogIn className="w-3.5 h-3.5 text-teal" />
-                    <span>Sign In</span>
+                    <span>{t('nav.signIn')}</span>
                   </Link>
                   <Link
                     href="/register"
                     className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-teal text-white text-xs font-semibold hover:bg-teal-700 transition-colors shadow-glow-teal"
                   >
-                    <span>Sign Up</span>
+                    <span>{t('nav.register')}</span>
                   </Link>
                 </div>
               )}
@@ -308,7 +292,7 @@ export default function LandingPage() {
                 href="/dashboard"
                 className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-teal-500 text-white text-sm font-semibold hover:from-teal-700 hover:to-teal-600 transition-all duration-200 shadow-glow-teal hover:shadow-lg"
               >
-                Check My Risk →
+                {t('landing.ctaButton')} →
               </Link>
             </div>
           </div>
@@ -335,7 +319,7 @@ export default function LandingPage() {
             >
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-risk-severe/10 text-risk-severe border border-risk-severe/20 text-sm font-semibold mb-6 severe-breathing">
                 <span className="w-2 h-2 rounded-full bg-risk-severe animate-pulse" />
-                3 wards at Severe flood risk right now
+                <span>3 {t('landing.statsHighRiskWards')}</span>
               </div>
             </motion.div>
 
@@ -345,12 +329,7 @@ export default function LandingPage() {
               transition={{ delay: 0.1, duration: 0.7 }}
               className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-ink leading-tight mb-6 font-display tracking-tight"
             >
-              Know Your{' '}
-              <span className="bg-gradient-to-r from-teal-600 via-teal-500 to-teal-700 bg-clip-text text-transparent">
-                Neighbourhood Risk
-              </span>
-              <br />
-              Before It&apos;s Too Late
+              {t('landing.heroTitle')}
             </motion.h1>
 
             <motion.p
@@ -359,9 +338,7 @@ export default function LandingPage() {
               transition={{ delay: 0.2, duration: 0.6 }}
               className="text-lg text-ink-500 mb-8 max-w-2xl mx-auto leading-relaxed"
             >
-              Hyperlocal flood and heat risk alerts for your exact neighbourhood. 
-              Actionable guidance in your language. Verified nearby shelters. 
-              Built for India&apos;s most vulnerable communities.
+              {t('landing.heroSubtitle')}
             </motion.p>
 
             {/* Search / Location */}
@@ -380,7 +357,7 @@ export default function LandingPage() {
                     type="text"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Enter area, ward or PIN code..."
+                    placeholder={t('landing.searchPlaceholder')}
                     className="flex-1 px-3 py-4 bg-transparent text-ink placeholder:text-ink-400 focus:outline-none text-base"
                     id="hero-search"
                   />
@@ -392,10 +369,10 @@ export default function LandingPage() {
                     {isSearching ? (
                       <>
                         <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Searching...
+                        {t('common.loading')}
                       </>
                     ) : (
-                      'Check Risk'
+                      t('common.search')
                     )}
                   </button>
                 </div>
@@ -410,15 +387,15 @@ export default function LandingPage() {
                   {isLocating ? (
                     <>
                       <span className="w-4 h-4 border-2 border-teal-500/30 border-t-teal-600 rounded-full animate-spin" />
-                      Locating via GPS...
+                      {t('landing.locating')}
                     </>
                   ) : (
-                    <>📱 Use my location</>
+                    <>📱 {t('landing.useLocation')}</>
                   )}
                 </button>
                 <span className="text-sand-300">|</span>
                 <Link href="/map" className="text-sm text-ink-500 hover:text-teal-600 transition-colors font-medium">
-                  🗺️ View risk map
+                  🗺️ {t('nav.map')}
                 </Link>
               </div>
 
@@ -431,7 +408,7 @@ export default function LandingPage() {
                   <button
                     onClick={() => setGeoError(null)}
                     className="text-amber-700 hover:text-amber-900 font-bold p-1 shrink-0"
-                    title="Dismiss"
+                    title={t('common.dismiss')}
                   >
                     ✕
                   </button>
@@ -444,22 +421,10 @@ export default function LandingPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5, duration: 0.5 }}
-              className="flex flex-wrap items-center justify-center gap-2"
+              className="flex flex-col sm:flex-row items-center justify-center gap-2"
             >
-              <span className="text-xs text-ink-400 mr-1 font-medium">Available in:</span>
-              {languageChips.map(l => (
-                <button
-                  key={l.code}
-                  onClick={() => setSelectedLanguage(l.code)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                    selectedLanguage === l.code
-                      ? 'bg-teal-600 text-white shadow-soft font-semibold'
-                      : 'bg-white text-ink-500 border border-sand-200 hover:border-sand-300 hover:text-ink shadow-xs'
-                  }`}
-                >
-                  {l.label}
-                </button>
-              ))}
+              <span className="text-xs text-ink-400 font-medium shrink-0">{t('landing.availableIn')}</span>
+              <LanguageSelector variant="chips" className="justify-center" />
             </motion.div>
           </div>
         </div>
@@ -475,25 +440,25 @@ export default function LandingPage() {
               <div className="text-3xl lg:text-4xl font-extrabold text-ink font-display">
                 <AnimatedCounter value={22} />
               </div>
-              <p className="text-sm font-medium text-ink-500 mt-1">Wards Monitored</p>
+              <p className="text-sm font-medium text-ink-500 mt-1">{t('landing.statsWardsMonitored')}</p>
             </div>
             <div className="pt-2 md:pt-0">
               <div className="text-3xl lg:text-4xl font-extrabold text-risk-severe font-display">
                 <AnimatedCounter value={3} />
               </div>
-              <p className="text-sm font-medium text-ink-500 mt-1">Wards at Severe Risk</p>
+              <p className="text-sm font-medium text-ink-500 mt-1">{t('landing.statsHighRiskWards')}</p>
             </div>
             <div className="pt-2 md:pt-0">
               <div className="text-3xl lg:text-4xl font-extrabold text-teal-600 font-display">
                 <AnimatedCounter value={10} />
               </div>
-              <p className="text-sm font-medium text-ink-500 mt-1">Verified Shelters</p>
+              <p className="text-sm font-medium text-ink-500 mt-1">{t('landing.statsOpenShelters')}</p>
             </div>
             <div className="pt-2 md:pt-0">
               <div className="text-3xl lg:text-4xl font-extrabold text-saffron font-display">
                 <AnimatedCounter value={285} suffix="K" />
               </div>
-              <p className="text-sm font-medium text-ink-500 mt-1">People Monitored</p>
+              <p className="text-sm font-medium text-ink-500 mt-1">{t('landing.liveSensorData')}</p>
             </div>
           </div>
         </div>
@@ -510,50 +475,50 @@ export default function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-14"
           >
-            <span className="inline-block px-3 py-1 rounded-full bg-teal-50 border border-teal-200/80 text-teal-700 text-xs font-semibold uppercase tracking-wider mb-4 shadow-xs">Features</span>
+            <span className="inline-block px-3 py-1 rounded-full bg-teal-50 border border-teal-200/80 text-teal-700 text-xs font-semibold uppercase tracking-wider mb-4 shadow-xs">{t('nav.features')}</span>
             <h2 className="text-3xl lg:text-4xl font-bold text-ink font-display mb-4 tracking-tight">
-              Neighbourhood-Level Intelligence
+              {t('landing.featuresTitle')}
             </h2>
             <p className="text-ink-500 max-w-2xl mx-auto text-base">
-              Not just city-wide warnings. We analyze your exact neighbourhood&apos;s elevation, drainage, land cover, and vulnerability to give you precise, actionable risk information.
+              {t('landing.featuresSubtitle')}
             </p>
           </motion.div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <FeatureCard
               icon="🎯"
-              title="Hyperlocal Risk Scores"
-              description="Flood and heat risk computed per hex cell (~500m) using elevation, drainage, rainfall, and 10+ data sources. Not just city-wide — your block."
+              title={t('landing.featureRiskTitle')}
+              description={t('landing.featureRiskDesc')}
               delay={0}
             />
             <FeatureCard
               icon="🗣️"
-              title="Multi-Language Alerts"
-              description="Alerts in English, Hindi, Telugu and 9 more Indian languages. Audio 'Listen' button for every alert. Designed for low-literacy users."
+              title={t('landing.featureI18nTitle')}
+              description={t('landing.featureI18nDesc')}
               delay={0.1}
             />
             <FeatureCard
               icon="🛡️"
-              title="Verified Shelters"
-              description="Find nearest verified shelter with walking time, capacity, facilities, and flood-safety status. Avoid flooded routes with smart routing."
+              title={t('landing.featureSheltersTitle')}
+              description={t('landing.featureSheltersDesc')}
               delay={0.2}
             />
             <FeatureCard
-              icon="📊"
-              title="Explainable AI"
-              description="'Why is my risk high?' Every score shows contributing factors in plain language. See exactly what data drives your alert."
+              icon="👥"
+              title={t('landing.featureCommunityTitle')}
+              description={t('landing.featureCommunityDesc')}
               delay={0.3}
             />
             <FeatureCard
-              icon="👥"
-              title="Community Reports"
-              description="Report waterlogging, blocked drains, heat stress. Neighbours confirm reports. Ground truth improves future predictions."
+              icon="🏛️"
+              title={t('nav.municipalPortal')}
+              description={t('landing.step4Desc')}
               delay={0.4}
             />
             <FeatureCard
-              icon="🏛️"
-              title="Municipal Dashboard"
-              description="Ward-level monitoring, alert dispatch, resource planning, shelter management. Designed for disaster response teams."
+              icon="📊"
+              title={t('landing.step2Title')}
+              description={t('landing.step2Desc')}
               delay={0.5}
             />
           </div>
@@ -571,39 +536,42 @@ export default function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-14"
           >
-            <span className="inline-block px-3 py-1 rounded-full bg-saffron-50 border border-saffron-200 text-saffron-700 text-xs font-semibold uppercase tracking-wider mb-4 shadow-xs">How It Works</span>
+            <span className="inline-block px-3 py-1 rounded-full bg-saffron-50 border border-saffron-200 text-saffron-700 text-xs font-semibold uppercase tracking-wider mb-4 shadow-xs">{t('nav.howItWorks')}</span>
             <h2 className="text-3xl lg:text-4xl font-bold text-ink font-display mb-4">
-              From Data to Action in Real Time
+              {t('landing.howItWorksTitle')}
             </h2>
+            <p className="text-ink-500 max-w-2xl mx-auto text-base">
+              {t('landing.howItWorksSubtitle')}
+            </p>
           </motion.div>
 
           <div className="max-w-2xl mx-auto space-y-10">
             <HowItWorksStep
               number={1}
               icon="🛰️"
-              title="Ingest Multi-Source Data"
-              description="Weather forecasts (Open-Meteo), rainfall, elevation (SRTM), drainage (OSM), land cover (Sentinel-2), and vulnerability data — fused every 15 minutes."
+              title={t('landing.step1Title')}
+              description={t('landing.step1Desc')}
               delay={0}
             />
             <HowItWorksStep
               number={2}
               icon="🧠"
-              title="Compute Neighbourhood Risk"
-              description="AI model combines 15+ features per hex cell to produce flood and heat risk scores at Now, +6h, +24h, +72h horizons with confidence levels."
+              title={t('landing.step2Title')}
+              description={t('landing.step2Desc')}
               delay={0.1}
             />
             <HowItWorksStep
               number={3}
               icon="📣"
-              title="Deliver Personalized Alerts"
-              description="Alerts sent via app, SMS, WhatsApp, and voice in your language. Tailored guidance for outdoor workers, elderly, low-lying homes."
+              title={t('landing.step3Title')}
+              description={t('landing.step3Desc')}
               delay={0.2}
             />
             <HowItWorksStep
               number={4}
               icon="🏃"
-              title="Guide to Safety"
-              description="'What to do now' checklists, nearest verified shelter with walking time, tap-to-call emergency numbers, 'I need help' button."
+              title={t('landing.step4Title')}
+              description={t('landing.step4Desc')}
               delay={0.3}
             />
           </div>
@@ -621,9 +589,9 @@ export default function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-14"
           >
-            <span className="inline-block px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold uppercase tracking-wider mb-4 shadow-xs">Who It&apos;s For</span>
+            <span className="inline-block px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold uppercase tracking-wider mb-4 shadow-xs">{t('nav.whoItsFor')}</span>
             <h2 className="text-3xl lg:text-4xl font-bold text-ink font-display mb-4">
-              Built for Those Who Need It Most
+              {t('landing.featuresSubtitle')}
             </h2>
           </motion.div>
 
@@ -648,7 +616,7 @@ export default function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-14"
           >
-            <span className="inline-block px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-700 text-xs font-semibold uppercase tracking-wider mb-4 shadow-xs">Transparency</span>
+            <span className="inline-block px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-700 text-xs font-semibold uppercase tracking-wider mb-4 shadow-xs">{t('nav.dataSources')}</span>
             <h2 className="text-3xl lg:text-4xl font-bold text-ink font-display mb-4">
               Open Data, Transparent Models
             </h2>
@@ -707,25 +675,24 @@ export default function LandingPage() {
             </div>
             <div className="relative">
               <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-display">
-                Check Your Neighbourhood Risk Now
+                {t('landing.ctaTitle')}
               </h2>
               <p className="text-teal-100 mb-8 max-w-xl mx-auto">
-                Free. No sign-up required for risk viewing. Available in 12 languages.
-                Works offline after first load.
+                {t('landing.ctaSubtitle')}
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   href="/dashboard"
                   className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-white text-teal-700 font-bold text-lg hover:bg-teal-50 transition-all duration-200 shadow-xl hover:shadow-2xl hover:-translate-y-0.5 group"
                 >
-                  Check My Risk
+                  {t('landing.ctaButton')}
                   <span className="group-hover:translate-x-1 transition-transform duration-200">→</span>
                 </Link>
                 <Link
                   href="/dashboard/municipal"
                   className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-white/10 text-white border border-white/20 font-semibold hover:bg-white/20 transition-all duration-200"
                 >
-                  Municipal Dashboard
+                  {t('nav.municipalPortal')}
                 </Link>
               </div>
             </div>
@@ -745,41 +712,40 @@ export default function LandingPage() {
                 <span className="font-bold text-lg text-ink font-display">Nirvana</span>
               </div>
               <p className="text-sm text-ink-400 leading-relaxed">
-                Hyperlocal climate risk alerts for vulnerable urban communities. Pilot: Hyderabad, Telangana.
+                {t('common.tagline')}. Pilot: Hyderabad, Telangana.
               </p>
             </div>
             <div>
-              <h4 className="font-semibold text-ink mb-3">Quick Links</h4>
+              <h4 className="font-semibold text-ink mb-3">{t('nav.citizenDashboard')}</h4>
               <div className="space-y-2">
-                <Link href="/dashboard" className="block text-sm text-ink-400 hover:text-teal transition-colors">Risk Dashboard</Link>
-                <Link href="/map" className="block text-sm text-ink-400 hover:text-teal transition-colors">Risk Map</Link>
-                <Link href="/shelters" className="block text-sm text-ink-400 hover:text-teal transition-colors">Find Shelters</Link>
-                <Link href="/guide" className="block text-sm text-ink-400 hover:text-teal transition-colors">Safety Guide</Link>
+                <Link href="/dashboard" className="block text-sm text-ink-400 hover:text-teal transition-colors">{t('dashboard.title')}</Link>
+                <Link href="/map" className="block text-sm text-ink-400 hover:text-teal transition-colors">{t('nav.map')}</Link>
+                <Link href="/shelters" className="block text-sm text-ink-400 hover:text-teal transition-colors">{t('nav.shelters')}</Link>
+                <Link href="/guide" className="block text-sm text-ink-400 hover:text-teal transition-colors">{t('nav.guide')}</Link>
               </div>
             </div>
             <div>
-              <h4 className="font-semibold text-ink mb-3">Emergency</h4>
+              <h4 className="font-semibold text-ink mb-3">{t('guide.emergencyContacts')}</h4>
               <div className="space-y-2">
-                <a href="tel:112" className="block text-sm text-ink-400 hover:text-teal transition-colors">📞 Emergency: 112</a>
+                <a href="tel:112" className="block text-sm text-ink-400 hover:text-teal transition-colors">📞 {t('common.emergencyHelpline')}</a>
+                <a href="tel:1070" className="block text-sm text-ink-400 hover:text-teal transition-colors">🛡️ {t('common.disasterHelpline')}</a>
                 <a href="tel:108" className="block text-sm text-ink-400 hover:text-teal transition-colors">🚑 Ambulance: 108</a>
-                <a href="tel:1070" className="block text-sm text-ink-400 hover:text-teal transition-colors">🛡️ Disaster: 1070</a>
                 <a href="tel:040-21111111" className="block text-sm text-ink-400 hover:text-teal transition-colors">🏛️ GHMC: 040-21111111</a>
               </div>
             </div>
             <div>
-              <h4 className="font-semibold text-ink mb-3">About</h4>
+              <h4 className="font-semibold text-ink mb-3">{t('nav.settings')}</h4>
               <div className="space-y-2">
-                <Link href="/about" className="block text-sm text-ink-400 hover:text-teal transition-colors">About Nirvana</Link>
-                <Link href="/privacy" className="block text-sm text-ink-400 hover:text-teal transition-colors">Privacy Policy</Link>
-                <Link href="/terms" className="block text-sm text-ink-400 hover:text-teal transition-colors">Terms of Use</Link>
-                <Link href="/api-docs" className="block text-sm text-ink-400 hover:text-teal transition-colors">API Documentation</Link>
+                <Link href="/settings" className="block text-sm text-ink-400 hover:text-teal transition-colors">{t('settings.title')}</Link>
+                <Link href="/report" className="block text-sm text-ink-400 hover:text-teal transition-colors">{t('nav.report')}</Link>
+                <Link href="/dashboard/municipal" className="block text-sm text-ink-400 hover:text-teal transition-colors">{t('nav.municipalPortal')}</Link>
               </div>
             </div>
           </div>
           <div className="border-t border-sand-200 mt-8 pt-8">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <p className="text-xs text-ink-300">
-                © 2026 Nirvana. Advisory platform — always follow official IMD/NDMA warnings.
+                {t('landing.footerCopyright')} {t('common.advisory')}
               </p>
               <p className="text-xs text-ink-300 bg-saffron/10 px-3 py-1 rounded-full">
                 ⚠️ All displayed data is synthetic/illustrative for demonstration purposes

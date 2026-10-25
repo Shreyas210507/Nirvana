@@ -4,6 +4,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { cn, getRiskColor } from '@/lib/utils';
 import { RiskLevel, HazardType } from '@/lib/types';
+import { useI18n } from '@/lib/i18n-context';
+import { languages as defaultLanguages } from '@/lib/mock-data';
 
 interface RiskGaugeProps {
   level: RiskLevel;
@@ -513,51 +515,90 @@ export function CardSkeleton() {
 // LANGUAGE SELECTOR
 // ============================================================================
 interface LanguageSelectorProps {
-  languages: Array<{ code: string; nativeName: string; name: string }>;
-  selected: string;
-  onChange: (code: string) => void;
+  languages?: Array<{ code: string; nativeName: string; name: string }>;
+  selected?: string;
+  onChange?: (code: string) => void;
   variant?: 'chips' | 'dropdown';
   className?: string;
+  ariaLabel?: string;
 }
 
-export function LanguageSelector({ languages, selected, onChange, variant = 'chips', className }: LanguageSelectorProps) {
+function useI18nSafe() {
+  try {
+    return useI18n();
+  } catch {
+    return null;
+  }
+}
+
+export function LanguageSelector({
+  languages: propLanguages,
+  selected: propSelected,
+  onChange: propOnChange,
+  variant = 'chips',
+  className,
+  ariaLabel = 'Select language',
+}: LanguageSelectorProps) {
+  const i18n = useI18nSafe();
+  const languages = propLanguages || i18n?.languages || defaultLanguages;
+  const selected = propSelected || i18n?.locale || 'en';
+  const onChange = propOnChange || (i18n ? ((code: string) => i18n.setLocale(code as any)) : () => {});
+
   if (variant === 'chips') {
     return (
-      <div className={cn('flex flex-wrap gap-2', className)}>
-        {languages.map(lang => (
-          <button
-            key={lang.code}
-            onClick={() => onChange(lang.code)}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200',
-              selected === lang.code
-                ? 'bg-teal text-white shadow-glow-teal'
-                : 'bg-sand-100 text-ink-500 hover:bg-sand-200'
-            )}
-          >
-            {lang.nativeName}
-          </button>
-        ))}
+      <div
+        role="group"
+        aria-label={ariaLabel}
+        className={cn('flex flex-wrap gap-2', className)}
+      >
+        {languages.map((lang) => {
+          const isSelected = selected === lang.code;
+          return (
+            <button
+              key={lang.code}
+              type="button"
+              onClick={() => onChange(lang.code)}
+              aria-pressed={isSelected}
+              aria-label={`${lang.nativeName} (${lang.name})`}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-teal/40',
+                isSelected
+                  ? 'bg-teal text-white shadow-glow-teal font-semibold scale-102'
+                  : 'bg-sand-100 text-ink-500 hover:bg-sand-200 hover:text-ink'
+              )}
+            >
+              <span>{lang.nativeName}</span>
+              {isSelected && <span className="sr-only"> (Selected)</span>}
+            </button>
+          );
+        })}
       </div>
     );
   }
-  
+
   return (
-    <select
-      value={selected}
-      onChange={e => onChange(e.target.value)}
-      className={cn(
-        'px-3 py-2 rounded-xl bg-white border border-sand-200 text-sm text-ink font-medium',
-        'focus:outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal',
-        className
-      )}
-    >
-      {languages.map(lang => (
-        <option key={lang.code} value={lang.code}>
-          {lang.nativeName} ({lang.name})
-        </option>
-      ))}
-    </select>
+    <div className="relative inline-block">
+      <label htmlFor="language-selector-dropdown" className="sr-only">
+        {ariaLabel}
+      </label>
+      <select
+        id="language-selector-dropdown"
+        value={selected}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={ariaLabel}
+        className={cn(
+          'px-3 py-2 rounded-xl bg-white border border-sand-200 text-sm text-ink font-medium shadow-xs',
+          'focus:outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal cursor-pointer',
+          className
+        )}
+      >
+        {languages.map((lang) => (
+          <option key={lang.code} value={lang.code}>
+            {lang.nativeName} ({lang.name})
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 

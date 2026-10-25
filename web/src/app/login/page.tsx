@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, ShieldCheck, UserCheck, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n-context';
+import { LanguageSelector } from '@/components/ui';
 
 function LoginForm() {
   const router = useRouter();
@@ -13,6 +15,7 @@ function LoginForm() {
   const redirectPath = searchParams.get('redirect') || '';
 
   const { login, isAuthenticated, user, error: authError, clearError } = useAuth();
+  const { t } = useI18n();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -104,7 +107,7 @@ function LoginForm() {
       {/* Top Advisory Banner */}
       <div className="bg-teal-50 border-b border-teal-100 px-4 py-2">
         <p className="text-center text-xs text-teal-800 font-medium max-w-4xl mx-auto flex items-center justify-center gap-1.5">
-          <span className="text-teal-600 font-bold">ⓘ</span> Secure Nirvana Authentication. All credentials are encrypted and verified against real backend servers.
+          <span className="text-teal-600 font-bold">ⓘ</span> {t('common.advisory')}
         </p>
       </div>
 
@@ -118,17 +121,20 @@ function LoginForm() {
         >
           {/* Brand & Title */}
           <div className="text-center">
-            <Link href="/" className="inline-flex items-center gap-2.5 mb-4 group">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-glow-teal group-hover:scale-105 transition-transform duration-200">
-                <span className="text-white text-xl">🏘️</span>
-              </div>
-              <span className="font-bold text-2xl text-ink font-display tracking-tight">Nirvana</span>
-            </Link>
+            <div className="flex items-center justify-between mb-2">
+              <Link href="/" className="inline-flex items-center gap-2.5 group">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-glow-teal group-hover:scale-105 transition-transform duration-200">
+                  <span className="text-white text-xl">🏘️</span>
+                </div>
+                <span className="font-bold text-2xl text-ink font-display tracking-tight">Nirvana</span>
+              </Link>
+              <LanguageSelector variant="dropdown" className="text-xs" />
+            </div>
             <h1 className="text-3xl font-extrabold text-ink font-display tracking-tight">
-              Sign In to Nirvana
+              {t('auth.signInTitle')}
             </h1>
             <p className="mt-2 text-sm text-ink-400">
-              Hyperlocal climate intelligence, verified alerts, and emergency response.
+              {t('auth.signInSubtitle')}
             </p>
           </div>
 
@@ -207,7 +213,7 @@ function LoginForm() {
                   htmlFor="email-address"
                   className="block text-xs font-semibold uppercase tracking-wider text-ink-500 mb-1.5"
                 >
-                  Email Address
+                  {t('auth.email')}
                 </label>
                 <input
                   id="email-address"
@@ -229,13 +235,13 @@ function LoginForm() {
                     htmlFor="password"
                     className="block text-xs font-semibold uppercase tracking-wider text-ink-500"
                   >
-                    Password
+                    {t('auth.password')}
                   </label>
                   <Link
                     href="/forgot-password"
                     className="text-xs font-medium text-teal hover:text-teal-700 transition-colors"
                   >
-                    Forgot password?
+                    {t('auth.forgotPassword')}
                   </Link>
                 </div>
                 <div className="relative">
@@ -270,7 +276,7 @@ function LoginForm() {
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="w-4 h-4 rounded text-teal focus:ring-teal/30 border-sand-300 accent-teal"
                   />
-                  <span className="text-xs text-ink-500 font-medium">Keep me signed in</span>
+                  <span className="text-xs text-ink-500 font-medium">{t('auth.rememberMe')}</span>
                 </label>
               </div>
 
@@ -283,11 +289,11 @@ function LoginForm() {
                 {isSubmitting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Signing In...</span>
+                    <span>{t('common.loading')}</span>
                   </>
                 ) : (
                   <>
-                    <span>Sign In</span>
+                    <span>{t('auth.signInButton')}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -297,12 +303,12 @@ function LoginForm() {
             {/* Sign Up Link */}
             <div className="text-center pt-2">
               <p className="text-xs text-ink-400">
-                Don&apos;t have an account yet?{' '}
+                {t('auth.noAccount')}{' '}
                 <Link
                   href="/register"
                   className="font-semibold text-teal hover:text-teal-700 transition-colors"
                 >
-                  Create an account
+                  {t('nav.register')}
                 </Link>
               </p>
             </div>

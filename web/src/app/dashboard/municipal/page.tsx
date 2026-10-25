@@ -3,11 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { KPICard, RiskBadge, AlertCard, ShelterCard, ReportCard, DataFreshness, TimelineChips } from '@/components/ui';
+import { KPICard, RiskBadge, AlertCard, ShelterCard, ReportCard, DataFreshness, TimelineChips, LanguageSelector } from '@/components/ui';
 import { generateWardRisks, generateDashboardKPIs, mockAlerts, hyderabadShelters, mockReports, hyderabadWards, dataSourceStatuses, simulationScenarios } from '@/lib/mock-data';
 import { getRiskColor } from '@/lib/utils';
 import type { WardRisk, DashboardKPIs } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n-context';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { LogOut } from 'lucide-react';
 
@@ -410,6 +411,7 @@ export default function MunicipalDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <LanguageSelector variant="dropdown" className="text-xs" />
               {/* Simulation button */}
               <button
                 onClick={() => setSimulationActive(!simulationActive)}
