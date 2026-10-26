@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { AlertCard, LanguageSelector } from '@/components/ui';
@@ -14,7 +14,7 @@ import { LocationModal } from '@/components/ui/location-modal';
 import type { WeatherForecast, Alert } from '@/lib/types';
 import { MapPin, RefreshCw } from 'lucide-react';
 
-export default function AlertsPage() {
+function AlertsContent() {
   const { t, speak } = useI18n();
   const { currentLocation } = useLocation();
   const [filter, setFilter] = useState<'active' | 'upcoming' | 'history'>('active');
@@ -210,5 +210,19 @@ export default function AlertsPage() {
         </div>
       </nav>
     </div>
+  );
+}
+
+export default function AlertsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-cream-100 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-teal/20 border-t-teal rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <AlertsContent />
+    </Suspense>
   );
 }

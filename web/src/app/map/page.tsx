@@ -8,7 +8,8 @@ import { RiskBadge, TimelineChips, DataFreshness, LanguageSelector } from '@/com
 import { useI18n } from '@/lib/i18n-context';
 import { generateWardRisks, hyderabadWards } from '@/lib/mock-data';
 import { getRiskColor } from '@/lib/utils';
-import type { WardRisk } from '@/lib/types';
+import type { WardRisk, Horizon, CommunityReport } from '@/lib/types';
+import { fetchWardRisks, fetchReports } from '@/lib/nirvana-api';
 import { InteractiveMap } from '@/components/map/interactive-map';
 import { Layers } from 'lucide-react';
 
@@ -135,6 +136,7 @@ function WardDetailPanel({ ward, onClose }: { ward: WardRisk; onClose: () => voi
 function MapPageContent() {
   const searchParams = useSearchParams();
   const [wardRisks, setWardRisks] = useState<WardRisk[]>([]);
+  const [reports, setReports] = useState<CommunityReport[]>([]);
   const [hazardView, setHazardView] = useState<'flood' | 'heat'>('flood');
   const [selectedHorizon, setSelectedHorizon] = useState('now');
   const [selectedWard, setSelectedWard] = useState<string | null>(null);
@@ -146,7 +148,21 @@ function MapPageContent() {
   const { t } = useI18n();
 
   useEffect(() => {
-    setWardRisks(generateWardRisks());
+    fetchWardRisks(selectedHorizon as Horizon)
+      .then((risks) => setWardRisks(risks))
+      .catch((err) => {
+        console.warn('Could not load ward risks for map:', err);
+        setWardRisks(generateWardRisks());
+      });
+  }, [selectedHorizon]);
+
+  useEffect(() => {
+    fetchReports()
+      .then((reps) => {
+        if (reps && reps.length > 0) setReports(reps);
+      })
+      .catch((err) => console.warn('Could not load reports for map:', err));
+
     const wardParam = searchParams.get('ward');
     if (wardParam) {
       setSelectedWard(wardParam);
@@ -275,6 +291,7 @@ function MapPageContent() {
       <div className="flex-1 relative overflow-hidden">
         <InteractiveMap
           wardRisks={displayWardRisks}
+          reports={reports}
           activeLayers={activeLayers}
           selectedWard={selectedWard}
           onWardSelect={setSelectedWard}

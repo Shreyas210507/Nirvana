@@ -9,7 +9,7 @@ Architecture: city-agnostic. Ward data drives the computation.
 
 import math
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Tuple
 
 from app.models import RiskScore, RiskFactor, WardRisk, RiskLevel, WardBase
@@ -200,7 +200,7 @@ def compute_ward_risks(
 ) -> List[WardRisk]:
     """Compute risk scores for all wards given current weather conditions."""
     results: List[WardRisk] = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     for ward in wards:
         # Add per-ward rainfall variance (some wards get more rain)

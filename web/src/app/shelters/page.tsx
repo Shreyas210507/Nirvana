@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ShelterCard, LanguageSelector } from '@/components/ui';
@@ -11,7 +11,7 @@ import { computeNearbyShelters } from '@/lib/shelter-service';
 import { LocationModal } from '@/components/ui/location-modal';
 import { MapPin } from 'lucide-react';
 
-export default function SheltersPage() {
+function SheltersContent() {
   const { t } = useI18n();
   const { currentLocation } = useLocation();
   const [view, setView] = useState<'list' | 'map'>('list');
@@ -190,5 +190,19 @@ export default function SheltersPage() {
         </div>
       </nav>
     </div>
+  );
+}
+
+export default function SheltersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-cream-100 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-teal/20 border-t-teal rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <SheltersContent />
+    </Suspense>
   );
 }

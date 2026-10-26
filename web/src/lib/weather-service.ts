@@ -227,6 +227,7 @@ function normalizeBackendWeather(lat: number, lng: number, data: any): WeatherFo
   return {
     lat,
     lng,
+    elevation: typeof data.elevation === 'number' ? Math.round(data.elevation) : undefined,
     current,
     hourly,
     daily,
@@ -310,6 +311,7 @@ function normalizeOpenMeteoRaw(lat: number, lng: number, raw: any): WeatherForec
   return {
     lat,
     lng,
+    elevation: typeof raw.elevation === 'number' ? Math.round(raw.elevation) : undefined,
     current,
     hourly,
     daily,

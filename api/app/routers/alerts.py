@@ -1,11 +1,12 @@
 """Alert endpoints — list, create, get by ID."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException, status
 from typing import Optional, List
-from app.models import AlertResponse, AlertCreate
-from app.mock_data import MOCK_ALERTS
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 import uuid
+
+from app.models import AlertResponse, AlertCreate
+from app.mock_data import MOCK_ALERTS, HYDERABAD_WARDS
 
 router = APIRouter()
 
@@ -33,13 +34,21 @@ async def get_alert(alert_id: str):
     for a in MOCK_ALERTS:
         if a.id == alert_id:
             return a
-    return {"error": "Alert not found"}
+    raise HTTPException(status_code=404, detail=f"Alert with ID '{alert_id}' not found")
 
 
-@router.post("", response_model=AlertResponse)
+@router.post("", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
 async def create_alert(alert: AlertCreate):
-    """Create and dispatch a new alert (demo — adds to in-memory list)."""
-    now = datetime.utcnow()
+    """Create and dispatch a new alert with ward name resolution."""
+    now = datetime.now(timezone.utc)
+    # Resolve ward names from HYDERABAD_WARDS
+    ward_name_map = {w.id: w.name for w in HYDERABAD_WARDS}
+    resolved_ward_names = [ward_name_map.get(wid, wid) for wid in alert.ward_ids]
+
+    # Calculate estimated reach based on actual ward population
+    selected_population = sum(w.population for w in HYDERABAD_WARDS if w.id in alert.ward_ids)
+    estimated_reach = selected_population if selected_population > 0 else len(alert.ward_ids) * 45000
+
     new_alert = AlertResponse(
         id=f"a-{uuid.uuid4().hex[:6]}",
         hazard=alert.hazard,
@@ -48,14 +57,19 @@ async def create_alert(alert: AlertCreate):
         message=alert.message,
         actions=alert.actions,
         ward_ids=alert.ward_ids,
-        ward_names=alert.ward_ids,  # In production, resolve from DB
+        ward_names=resolved_ward_names,
         issued_at=now,
         expires_at=now + timedelta(hours=6),
         is_active=True,
         language=alert.language,
         channels=alert.channels,
-        sent_by="API User",
-        estimated_reach=len(alert.ward_ids) * 50000,
+        sent_by="Municipal Command Operator",
+        estimated_reach=estimated_reach,
+        delivery_stats={
+            "sent": int(estimated_reach * 0.9),
+            "delivered": int(estimated_reach * 0.82),
+            "read": int(estimated_reach * 0.6),
+        },
     )
     MOCK_ALERTS.append(new_alert)
     return new_alert

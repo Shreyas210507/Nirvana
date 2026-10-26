@@ -352,6 +352,7 @@ interface ShelterCardProps {
       accessible: boolean;
     };
     contact?: string;
+    verifiedBy?: string;
   };
   compact?: boolean;
   className?: string;
@@ -386,8 +387,13 @@ export function ShelterCard({ shelter, compact = false, className }: ShelterCard
             <h4 className="font-semibold text-ink text-sm truncate">{shelter.name}</h4>
             {isVerified ? (
               <span className="text-xs text-teal">✓ Verified</span>
+            ) : shelter.verificationStatus === 'illustrative_demo' ? (
+              <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">⚠️ Demo Shelter</span>
             ) : (
               <span className="text-xs text-saffron">⚠ Unverified</span>
+            )}
+            {shelter.verifiedBy && (
+              <span className="text-[10px] text-ink-400 hidden sm:inline">• {shelter.verifiedBy}</span>
             )}
           </div>
           <p className="text-xs text-ink-400 mb-2 truncate">{shelter.address}</p>

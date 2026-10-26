@@ -21,9 +21,8 @@ export function evaluateDynamicAlerts(
 ): Alert[] {
   const alerts: Alert[] = [];
   const locationName = location.name || 'Selected Area';
-  const now = new Date();
-  const issuedIso = now.toISOString();
-  const expiresIso = new Date(now.getTime() + 6 * 3600 * 1000).toISOString();
+  const issuedIso = forecast?.lastUpdated || '2026-10-26T00:00:00.000Z';
+  const expiresIso = '2026-10-26T23:59:59.000Z';
 
   // Nearest verified shelter for active coordinates
   const nearestShelter = getNearestVerifiedShelter(
@@ -85,6 +84,8 @@ export function evaluateDynamicAlerts(
       `Nearest emergency shelter is ${nearestShelter.name} (${nearestShelter.distance ? (nearestShelter.distance < 1000 ? `${nearestShelter.distance}m` : `${(nearestShelter.distance / 1000).toFixed(1)}km`) : 'nearby'}, ~${nearestShelter.walkingTime || 10} min walk)`,
     ];
 
+    const wardPop = risk?.population || 48000;
+
     alerts.push({
       id: `alert-flood-${location.latitude.toFixed(3)}-${location.longitude.toFixed(3)}`,
       hazard: 'flood' as HazardType,
@@ -100,8 +101,8 @@ export function evaluateDynamicAlerts(
       language: 'en',
       nearestShelter,
       channels: ['in_app', 'push', 'sms'],
-      estimatedReach: 65000,
-      deliveryStats: { sent: 58000, delivered: 54000, read: 39000 },
+      sentBy: 'Nirvana Automated Early Warning Engine',
+      estimatedReach: wardPop,
     });
   }
 
@@ -146,6 +147,8 @@ export function evaluateDynamicAlerts(
       `Visit nearest verified cooling center at ${nearestShelter.name} if feeling dizzy or disoriented`,
     ];
 
+    const wardPop = risk?.population || 48000;
+
     alerts.push({
       id: `alert-heat-${location.latitude.toFixed(3)}-${location.longitude.toFixed(3)}`,
       hazard: 'heat' as HazardType,
@@ -161,8 +164,8 @@ export function evaluateDynamicAlerts(
       language: 'en',
       nearestShelter,
       channels: ['in_app', 'push', 'sms', 'whatsapp'],
-      estimatedReach: 92000,
-      deliveryStats: { sent: 88000, delivered: 81000, read: 61000 },
+      sentBy: 'Nirvana Automated Early Warning Engine',
+      estimatedReach: wardPop,
     });
   }
 
@@ -170,6 +173,7 @@ export function evaluateDynamicAlerts(
   const wmoCode = forecast?.current?.weatherCode ?? 0;
   const windSpeed = forecast?.current?.windSpeed ?? 0;
   if ((wmoCode >= 95 && wmoCode <= 99) || windSpeed > 45) {
+    const wardPop = risk?.population || 48000;
     alerts.push({
       id: `alert-thunder-${location.latitude.toFixed(3)}-${location.longitude.toFixed(3)}`,
       hazard: 'flood' as HazardType,
@@ -191,7 +195,8 @@ export function evaluateDynamicAlerts(
       language: 'en',
       nearestShelter,
       channels: ['in_app', 'push'],
-      estimatedReach: 45000,
+      sentBy: 'Nirvana Automated Early Warning Engine',
+      estimatedReach: wardPop,
     });
   }
 

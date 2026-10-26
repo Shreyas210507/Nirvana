@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { KPICard, RiskBadge, AlertCard, ShelterCard, ReportCard, DataFreshness, TimelineChips, LanguageSelector } from '@/components/ui';
 import { generateWardRisks, generateDashboardKPIs, mockAlerts, hyderabadShelters, mockReports, hyderabadWards, dataSourceStatuses, simulationScenarios } from '@/lib/mock-data';
 import { getRiskColor } from '@/lib/utils';
-import type { WardRisk, DashboardKPIs } from '@/lib/types';
+import type { WardRisk, DashboardKPIs, Alert, Shelter, CommunityReport } from '@/lib/types';
+import { fetchDashboardKPIs, fetchWardRisks, fetchReports, fetchShelters, fetchAlerts, confirmReport } from '@/lib/nirvana-api';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n-context';
 import { ProtectedRoute } from '@/components/auth/protected-route';
@@ -17,7 +18,15 @@ import { InteractiveMap } from '@/components/map/interactive-map';
 // ============================================================================
 // SIDEBAR NAV
 // ============================================================================
-function Sidebar({ activeTab, onTabChange }: { activeTab: string; onTabChange: (tab: string) => void }) {
+function Sidebar({
+  activeTab,
+  onTabChange,
+  reportsCount = 0,
+}: {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  reportsCount?: number;
+}) {
   const { user, logout, isAuthenticated } = useAuth();
   const tabs = [
     { id: 'overview', icon: '📊', label: 'Overview' },
@@ -60,7 +69,7 @@ function Sidebar({ activeTab, onTabChange }: { activeTab: string; onTabChange: (
             {tab.label}
             {tab.id === 'reports' && (
               <span className="ml-auto w-5 h-5 rounded-full bg-risk-severe/10 text-risk-severe text-[10px] font-bold flex items-center justify-center">
-                {mockReports.filter(r => r.status !== 'resolved').length}
+                {reportsCount}
               </span>
             )}
           </button>
@@ -375,22 +384,55 @@ function AlertComposer({ onClose }: { onClose: () => void }) {
 // ============================================================================
 // MAIN MUNICIPAL DASHBOARD
 // ============================================================================
-export default function MunicipalDashboard() {
+function MunicipalDashboardContent() {
   const [activeTab, setActiveTab] = useState('overview');
   const [wardRisks, setWardRisks] = useState<WardRisk[]>([]);
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
+  const [reports, setReports] = useState<CommunityReport[]>(mockReports);
+  const [shelters, setShelters] = useState<Shelter[]>(hyderabadShelters);
+  const [alerts, setAlerts] = useState<Alert[]>(mockAlerts);
+  const [reportsFilter, setReportsFilter] = useState<string>('All');
   const [loading, setLoading] = useState(true);
   const [hazardView, setHazardView] = useState<'flood' | 'heat'>('flood');
   const [showComposer, setShowComposer] = useState(false);
   const [simulationActive, setSimulationActive] = useState(false);
 
   useEffect(() => {
-    setTimeout(() => {
-      setWardRisks(generateWardRisks());
-      setKpis(generateDashboardKPIs());
-      setLoading(false);
-    }, 500);
+    Promise.all([
+      fetchWardRisks(),
+      fetchDashboardKPIs(),
+      fetchReports(),
+      fetchShelters(),
+      fetchAlerts(),
+    ])
+      .then(([wRisks, kpiData, reps, shs, alts]) => {
+        setWardRisks(wRisks);
+        setKpis(kpiData);
+        if (reps && reps.length > 0) setReports(reps);
+        if (shs && shs.length > 0) setShelters(shs);
+        if (alts && alts.length > 0) setAlerts(alts);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.warn('Could not load municipal dashboard data:', err);
+        setWardRisks(generateWardRisks());
+        setKpis(generateDashboardKPIs());
+        setLoading(false);
+      });
   }, []);
+
+  const handleConfirmReport = async (reportId: string) => {
+    await confirmReport(reportId);
+    setReports((prev) =>
+      prev.map((r) =>
+        r.id === reportId
+          ? { ...r, status: 'confirmed', confirmations: r.confirmations + 1 }
+          : r
+      )
+    );
+  };
+
+  const pendingReportsCount = reports.filter((r) => r.status !== 'resolved').length;
 
   return (
     <ProtectedRoute
@@ -399,7 +441,7 @@ export default function MunicipalDashboard() {
       fallbackMessage="Access to the Municipal Emergency Response Dashboard requires authorized responder or officer credentials. Please sign in with your municipal account to coordinate alerts and shelters."
     >
       <div className="flex h-screen bg-cream-100">
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} reportsCount={pendingReportsCount} />
       
       <main className="flex-1 overflow-y-auto">
         {/* Top bar */}
@@ -429,7 +471,7 @@ export default function MunicipalDashboard() {
               >
                 📣 Compose Alert
               </button>
-              <DataFreshness lastUpdated={'2026-10-25T19:15:00.000Z'} source="Auto-refresh" />
+              <DataFreshness lastUpdated={kpis?.lastUpdated || '2026-10-26T19:15:00.000Z'} source={kpis?.dataSource || 'Auto-refresh'} />
             </div>
           </div>
         </header>
@@ -512,7 +554,7 @@ export default function MunicipalDashboard() {
                   <div>
                     <h3 className="font-semibold text-ink text-sm mb-3 flex items-center gap-2">📣 Active Alerts</h3>
                     <div className="space-y-2">
-                      {mockAlerts.filter(a => a.isActive).map(alert => (
+                      {alerts.filter(a => a.isActive).map(alert => (
                         <AlertCard key={alert.id} alert={alert} compact />
                       ))}
                     </div>
@@ -530,7 +572,7 @@ export default function MunicipalDashboard() {
                       </button>
                     </div>
                     <div className="space-y-2">
-                      {mockReports.slice(0, 3).map(report => (
+                      {reports.slice(0, 3).map(report => (
                         <ReportCard key={report.id} report={report} />
                       ))}
                     </div>
@@ -629,7 +671,7 @@ export default function MunicipalDashboard() {
                 </button>
               </div>
               <div className="space-y-3">
-                {mockAlerts.map(alert => (
+                {alerts.map(alert => (
                   <div key={alert.id} className="bg-white rounded-2xl border border-sand-200 p-4 shadow-soft">
                     <AlertCard alert={alert} />
                     {alert.deliveryStats && (
@@ -658,18 +700,14 @@ export default function MunicipalDashboard() {
           {activeTab === 'shelters' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-ink">Shelter Management ({hyderabadShelters.length})</h2>
+                <h2 className="font-semibold text-ink">Shelter Management ({shelters.length})</h2>
                 <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal text-white text-sm font-semibold hover:bg-teal-600 transition-colors">
                   + Add Shelter
                 </button>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
-                {hyderabadShelters.map((shelter, i) => (
-                  <ShelterCard key={shelter.id} shelter={{
-                    ...shelter,
-                    distance: 500 + ((i * 397) % 3500),
-                    walkingTime: 5 + ((i * 7) % 25),
-                  }} />
+                {shelters.map((shelter) => (
+                  <ShelterCard key={shelter.id} shelter={shelter} />
                 ))}
               </div>
             </div>
@@ -679,12 +717,15 @@ export default function MunicipalDashboard() {
           {activeTab === 'reports' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-ink">Community Reports ({mockReports.length})</h2>
+                <h2 className="font-semibold text-ink">Community Reports ({reports.length})</h2>
                 <div className="flex gap-2">
                   {['All', 'Submitted', 'Confirmed', 'Under Review'].map(filter => (
                     <button
                       key={filter}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-sand-100 text-ink-500 hover:bg-sand-200 transition-colors"
+                      onClick={() => setReportsFilter(filter)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        reportsFilter === filter ? 'bg-teal text-white' : 'bg-sand-100 text-ink-500 hover:bg-sand-200'
+                      }`}
                     >
                       {filter}
                     </button>
@@ -692,22 +733,30 @@ export default function MunicipalDashboard() {
                 </div>
               </div>
               <div className="space-y-3">
-                {mockReports.map(report => (
-                  <div key={report.id} className="bg-white rounded-2xl border border-sand-200 p-4 shadow-soft">
-                    <ReportCard report={report} />
-                    <div className="mt-3 pt-3 border-t border-sand-100 flex gap-2">
-                      <button className="px-3 py-1.5 rounded-lg bg-risk-low/10 text-risk-low text-xs font-semibold hover:bg-risk-low/20 transition-colors">
-                        ✓ Verify
-                      </button>
-                      <button className="px-3 py-1.5 rounded-lg bg-teal/10 text-teal text-xs font-semibold hover:bg-teal/20 transition-colors">
-                        🔄 Assign Team
-                      </button>
-                      <button className="px-3 py-1.5 rounded-lg bg-sand-100 text-ink-500 text-xs font-semibold hover:bg-sand-200 transition-colors">
-                        ⊘ Reject
-                      </button>
+                {reports
+                  .filter(r => {
+                    if (reportsFilter === 'All') return true;
+                    if (reportsFilter === 'Submitted') return r.status === 'submitted';
+                    if (reportsFilter === 'Confirmed') return r.status === 'confirmed';
+                    if (reportsFilter === 'Under Review') return r.status === 'under_review';
+                    return true;
+                  })
+                  .map(report => (
+                    <div key={report.id} className="bg-white rounded-2xl border border-sand-200 p-4 shadow-soft">
+                      <ReportCard report={report} />
+                      <div className="mt-3 pt-3 border-t border-sand-100 flex gap-2">
+                        <button
+                          onClick={() => handleConfirmReport(report.id)}
+                          className="px-3 py-1.5 rounded-lg bg-risk-low/10 text-risk-low text-xs font-semibold hover:bg-risk-low/20 transition-colors"
+                        >
+                          ✓ Verify / Confirm
+                        </button>
+                        <button className="px-3 py-1.5 rounded-lg bg-teal/10 text-teal text-xs font-semibold hover:bg-teal/20 transition-colors">
+                          🔄 Assign Team
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           )}
@@ -821,6 +870,7 @@ export default function MunicipalDashboard() {
               <div className="h-[620px] w-full rounded-2xl overflow-hidden border border-sand-200 shadow-soft">
                 <InteractiveMap
                   wardRisks={wardRisks}
+                  reports={reports}
                   hazardView={hazardView}
                   activeLayers={new Set(['flood', 'heat', 'shelters', 'reports', 'wards'])}
                   className="w-full h-full"
@@ -851,11 +901,28 @@ export default function MunicipalDashboard() {
         </div>
       </main>
 
-      {/* Alert Composer Modal */}
-      <AnimatePresence>
-        {showComposer && <AlertComposer onClose={() => setShowComposer(false)} />}
-      </AnimatePresence>
+        {/* Alert Composer Modal */}
+        <AnimatePresence>
+          {showComposer && <AlertComposer onClose={() => setShowComposer(false)} />}
+        </AnimatePresence>
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function MunicipalDashboard() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen w-full flex items-center justify-center bg-cream-100">
+          <div className="text-center">
+            <div className="w-10 h-10 border-3 border-teal/20 border-t-teal rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm font-medium text-ink-500">Loading Command Dashboard...</p>
+          </div>
+        </div>
+      }
+    >
+      <MunicipalDashboardContent />
+    </Suspense>
   );
 }

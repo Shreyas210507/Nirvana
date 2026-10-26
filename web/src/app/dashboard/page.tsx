@@ -24,7 +24,8 @@ import {
   emergencyContacts,
   safetyGuidance,
 } from '@/lib/mock-data';
-import type { WardRisk, WeatherForecast, Horizon } from '@/lib/types';
+import type { WardRisk, WeatherForecast, Horizon, CommunityReport } from '@/lib/types';
+import { fetchWardRisks, fetchReports } from '@/lib/nirvana-api';
 import { useAuth } from '@/lib/auth-context';
 import { useLocation } from '@/lib/location-context';
 import { useI18n } from '@/lib/i18n-context';
@@ -332,6 +333,7 @@ function CitizenDashboardContent() {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState<boolean>(false);
   const [userWard, setUserWard] = useState('w-001'); // Malakpet default
   const [showEmergency, setShowEmergency] = useState(false);
+  const [communityReports, setCommunityReports] = useState<CommunityReport[]>(mockReports);
 
   // Sync search parameters from URL on initial load if provided
   useEffect(() => {
@@ -380,9 +382,23 @@ function CitizenDashboardContent() {
     }
   }, [currentLocation, user]);
 
-  // Load ward risk baseline
+  // Load ward risk baseline from API or model
   useEffect(() => {
-    setWardRisks(generateWardRisks());
+    fetchWardRisks(selectedHorizon as Horizon)
+      .then((risks) => setWardRisks(risks))
+      .catch((err) => {
+        console.warn('Could not load ward risks:', err);
+        setWardRisks(generateWardRisks());
+      });
+  }, [selectedHorizon]);
+
+  // Load live community reports
+  useEffect(() => {
+    fetchReports()
+      .then((reps) => {
+        if (reps && reps.length > 0) setCommunityReports(reps);
+      })
+      .catch((err) => console.warn('Could not load community reports:', err));
   }, []);
 
   // Fetch real weather forecast from Open-Meteo whenever coordinates change
@@ -497,7 +513,7 @@ function CitizenDashboardContent() {
   // Dynamic nearby reports based on proximity to active coordinates
   const nearbyReports = React.useMemo(() => {
     if (!currentLocation) return [];
-    return [...mockReports]
+    return [...communityReports]
       .map((r) => ({
         ...r,
         distanceKm: calculateDistanceKm(
@@ -509,7 +525,7 @@ function CitizenDashboardContent() {
       }))
       .sort((a, b) => a.distanceKm - b.distanceKm)
       .slice(0, 3);
-  }, [currentLocation]);
+  }, [currentLocation, communityReports]);
 
   const horizons = [
     { value: 'now', label: t('dashboard.now') },
@@ -625,7 +641,7 @@ function CitizenDashboardContent() {
               />
             </button>
             <DataFreshness
-              lastUpdated={forecast?.lastUpdated || currentRisk?.flood.computedAt || new Date().toISOString()}
+              lastUpdated={forecast?.lastUpdated || currentRisk?.flood.computedAt || '2026-10-26T19:15:00.000Z'}
               source="Open-Meteo"
             />
           </div>

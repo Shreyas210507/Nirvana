@@ -4,7 +4,7 @@ import sqlite3
 import os
 import logging
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pathlib import Path
 
 logger = logging.getLogger("nirvana.db")
@@ -13,19 +13,11 @@ DB_DIR = Path(__file__).parent
 DB_PATH = DB_DIR / "nirvana.db"
 
 
-def get_db():
-    """Get a SQLite database connection with row factory enabled."""
-    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    # Enable Write-Ahead Logging for better concurrency
-    conn.execute("PRAGMA journal_mode = WAL;")
-    conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
+_db_initialized = False
 
 
-def init_db():
-    """Initialize database tables for users, sessions, and password resets."""
-    conn = get_db()
+def _init_tables(conn):
+    """Execute CREATE TABLE IF NOT EXISTS statements."""
     cursor = conn.cursor()
 
     # Users table
@@ -77,7 +69,48 @@ def init_db():
     );
     """)
 
+    # Community Reports table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS reports (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'medium',
+        description TEXT NOT NULL DEFAULT '',
+        lat REAL NOT NULL,
+        lng REAL NOT NULL,
+        ward_id TEXT NOT NULL,
+        ward_name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'submitted',
+        confirmations INTEGER NOT NULL DEFAULT 0,
+        submitted_at TEXT NOT NULL,
+        language TEXT NOT NULL DEFAULT 'en'
+    );
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_ward ON reports(ward_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);")
     conn.commit()
+
+
+def get_db():
+    """Get a SQLite database connection with row factory enabled."""
+    global _db_initialized
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    # Enable Write-Ahead Logging for better concurrency
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA foreign_keys = ON;")
+    if not _db_initialized:
+        _db_initialized = True
+        _init_tables(conn)
+        seed_default_reports()
+    return conn
+
+
+def init_db():
+    """Initialize database tables for users, sessions, password resets, and community reports."""
+    conn = get_db()
+    _init_tables(conn)
+    seed_default_reports()
     conn.close()
     logger.info(f"Database initialized at {DB_PATH}")
 
@@ -264,3 +297,123 @@ def mark_password_reset_token_used(token: str) -> None:
     cursor.execute("UPDATE password_reset_tokens SET used = 1 WHERE token = ?", (token,))
     conn.commit()
     conn.close()
+
+
+# ============================================================================
+# COMMUNITY REPORTS OPERATIONS
+# ============================================================================
+def seed_default_reports() -> None:
+    """Seed initial demonstration reports if table is currently empty."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) as count FROM reports")
+    row = cursor.fetchone()
+    count = row["count"] if row else 0
+
+    if count == 0:
+        from app.mock_data import MOCK_REPORTS
+        for r in MOCK_REPORTS:
+            cursor.execute("""
+            INSERT OR IGNORE INTO reports (id, type, severity, description, lat, lng, ward_id, ward_name, status, confirmations, submitted_at, language)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                r.id, r.type, r.severity, r.description,
+                r.lat, r.lng, r.ward_id, r.ward_name,
+                r.status, r.confirmations, r.submitted_at.isoformat(), r.language
+            ))
+        conn.commit()
+        logger.info(f"Seeded {len(MOCK_REPORTS)} default demonstration community reports.")
+    conn.close()
+
+
+def create_report_record(
+    report_id: str,
+    report_type: str,
+    severity: str,
+    description: str,
+    lat: float,
+    lng: float,
+    ward_id: str,
+    ward_name: str,
+    language: str = "en",
+) -> Dict[str, Any]:
+    """Insert a new citizen community report into the database."""
+    conn = get_db()
+    cursor = conn.cursor()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cursor.execute("""
+    INSERT INTO reports (id, type, severity, description, lat, lng, ward_id, ward_name, status, confirmations, submitted_at, language)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'submitted', 0, ?, ?)
+    """, (report_id, report_type, severity, description.strip(), lat, lng, ward_id, ward_name, now_iso, language))
+    conn.commit()
+    conn.close()
+    return get_report_by_id(report_id) or {}
+
+
+def get_report_by_id(report_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieve single report record by ID."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM reports WHERE id = ?", (report_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
+
+
+def list_reports_records(
+    ward_id: Optional[str] = None,
+    report_type: Optional[str] = None,
+    status: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Retrieve filtered community reports."""
+    conn = get_db()
+    cursor = conn.cursor()
+    query = "SELECT * FROM reports WHERE 1=1"
+    params = []
+
+    if ward_id:
+        query += " AND ward_id = ?"
+        params.append(ward_id)
+    if report_type:
+        query += " AND type = ?"
+        params.append(report_type)
+    if status:
+        query += " AND status = ?"
+        params.append(status)
+
+    query += " ORDER BY submitted_at DESC"
+    cursor.execute(query, tuple(params))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def confirm_report_record(report_id: str) -> Optional[Dict[str, Any]]:
+    """Increment confirmation count for a report and promote status if verified."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT confirmations, status FROM reports WHERE id = ?", (report_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+
+    new_count = row["confirmations"] + 1
+    new_status = "confirmed" if new_count >= 3 and row["status"] == "submitted" else row["status"]
+
+    cursor.execute("UPDATE reports SET confirmations = ?, status = ? WHERE id = ?", (new_count, new_status, report_id))
+    conn.commit()
+    conn.close()
+    return get_report_by_id(report_id)
+
+
+def get_active_reports_count() -> int:
+    """Count of unresolved active reports."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) as count FROM reports WHERE status != 'resolved'")
+    row = cursor.fetchone()
+    conn.close()
+    return row["count"] if row else 0

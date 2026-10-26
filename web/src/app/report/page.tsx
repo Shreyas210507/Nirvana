@@ -4,15 +4,25 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useI18n } from '@/lib/i18n-context';
+import { useLocation } from '@/lib/location-context';
 import { LanguageSelector } from '@/components/ui';
+import { submitReport } from '@/lib/nirvana-api';
 
 export default function ReportPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const { currentLocation, requestDeviceLocation, isLocating } = useLocation();
   const [reportType, setReportType] = useState('');
   const [severity, setSeverity] = useState('');
   const [description, setDescription] = useState('');
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const activeLat = currentLocation?.latitude ?? 17.370;
+  const activeLng = currentLocation?.longitude ?? 78.506;
+  const activeName = currentLocation?.name ?? 'Malakpet, Charminar Zone';
+  const activeWardId = currentLocation?.wardId ?? 'w-001';
 
   const reportTypes = [
     { id: 'waterlogging', icon: '🌊', label: t('report.waterlogging'), desc: 'Standing water on roads or in colonies' },
@@ -28,8 +38,31 @@ export default function ReportPage() {
     { id: 'high', label: t('report.severityHigh'), desc: 'Dangerous situation', color: '#EF4444' },
   ];
 
-  const handleSubmit = () => {
-    setSubmitted(true);
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await submitReport({
+        type: reportType,
+        severity,
+        description,
+        lat: activeLat,
+        lng: activeLng,
+        wardId: activeWardId,
+        wardName: activeName,
+        language: locale,
+      });
+      if (res.success) {
+        setSubmitted(true);
+      } else {
+        setSubmitError(res.error || 'Failed to submit report.');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error submitting report';
+      setSubmitError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -189,12 +222,16 @@ export default function ReportPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-lg">📍</span>
                   <div>
-                    <p className="text-sm font-medium text-ink">Malakpet, Charminar Zone</p>
-                    <p className="text-xs text-ink-400">17.370°N, 78.506°E</p>
+                    <p className="text-sm font-medium text-ink">{activeName}</p>
+                    <p className="text-xs text-ink-400">{activeLat.toFixed(4)}°N, {activeLng.toFixed(4)}°E</p>
                   </div>
                 </div>
-                <button className="px-3 py-1.5 rounded-lg bg-sand-100 text-xs font-medium text-ink-500 hover:bg-sand-200 transition-colors">
-                  Change
+                <button
+                  onClick={() => requestDeviceLocation().catch(() => {})}
+                  disabled={isLocating}
+                  className="px-3 py-1.5 rounded-lg bg-sand-100 text-xs font-medium text-ink-500 hover:bg-sand-200 transition-colors disabled:opacity-50"
+                >
+                  {isLocating ? 'Locating...' : 'Update GPS'}
                 </button>
               </div>
             </div>
@@ -215,15 +252,29 @@ export default function ReportPage() {
               </p>
             </div>
 
+            {submitError && (
+              <div className="p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs">
+                ⚠️ {submitError}
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button onClick={() => setStep(2)} className="flex-1 px-4 py-3 rounded-xl bg-sand-100 text-ink-500 font-medium hover:bg-sand-200 transition-colors">
                 ← Back
               </button>
               <button
                 onClick={handleSubmit}
-                className="flex-1 px-4 py-3 rounded-xl bg-teal text-white font-semibold hover:bg-teal-600 transition-colors shadow-glow-teal"
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-3 rounded-xl bg-teal text-white font-semibold hover:bg-teal-600 transition-colors shadow-glow-teal disabled:opacity-75 flex items-center justify-center gap-2"
               >
-                ✓ Submit Report
+                {isSubmitting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  '✓ Submit Report'
+                )}
               </button>
             </div>
 

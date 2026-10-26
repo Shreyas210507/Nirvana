@@ -3,9 +3,10 @@
 from fastapi import APIRouter, Query
 from typing import Optional, List
 from app.models import WardRisk, DashboardKPIs, Horizon, WardBase
-from app.mock_data import HYDERABAD_WARDS
+from app.mock_data import HYDERABAD_WARDS, SHELTERS, MOCK_ALERTS
+from app.database import get_active_reports_count
 from app.risk_engine import compute_ward_risks
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -106,20 +107,32 @@ async def evaluate_risk(
 
 @router.get("/dashboard", response_model=DashboardKPIs)
 async def get_dashboard_kpis():
-    """Get aggregated KPIs for the municipal dashboard."""
+    """Get calculated KPIs for homepage and municipal command portal."""
     risks = compute_ward_risks(HYDERABAD_WARDS)
     severe_count = sum(1 for r in risks if r.flood.level == "severe" or r.heat.level == "severe")
     high_count = sum(1 for r in risks if r.flood.level == "high" or r.heat.level == "high")
     high_risk_pop = sum(r.population for r in risks if r.flood.level in ("severe", "high") or r.heat.level in ("severe", "high"))
 
+    open_shelters_count = len([s for s in SHELTERS if s.capacity > 0])
+    used_capacity = sum(s.current_occupancy for s in SHELTERS)
+    total_capacity = sum(s.capacity for s in SHELTERS)
+    active_reports_count = get_active_reports_count()
+    active_alerts_count = len([a for a in MOCK_ALERTS if a.is_active])
+    monitored_wards_count = len(HYDERABAD_WARDS)
+    active_telemetry_points = monitored_wards_count * 8  # 8 risk/weather parameters evaluated per ward
+
     return DashboardKPIs(
         wards_at_severe=severe_count,
         wards_at_high=high_count,
         people_in_high_risk=high_risk_pop,
-        shelters_open=4,
-        shelter_capacity_used=223,
-        shelter_capacity_total=1550,
-        active_reports=3,
-        alerts_sent_today=2,
-        last_updated=datetime.utcnow(),
+        shelters_open=open_shelters_count,
+        shelter_capacity_used=used_capacity,
+        shelter_capacity_total=total_capacity,
+        active_reports=active_reports_count,
+        alerts_sent_today=active_alerts_count,
+        wards_monitored=monitored_wards_count,
+        active_data_points=active_telemetry_points,
+        last_updated=datetime.now(timezone.utc),
+        data_source="Nirvana Risk Engine + Open-Meteo",
+        is_demonstration=True,
     )

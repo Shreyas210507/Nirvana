@@ -34,10 +34,12 @@ class WardBase(BaseModel):
     elderly_population_fraction: float = 0.08
     outdoor_worker_fraction: float = 0.15
     historical_flood_frequency: int = 0
+    historical_heatwave_days: int = 0
+    geometry: Optional[dict] = None
 
 
 class WardResponse(WardBase):
-    geometry: Optional[dict] = None
+    pass
 
 
 # ============================================================================
@@ -111,6 +113,7 @@ class AlertResponse(BaseModel):
 class ShelterResponse(BaseModel):
     id: str
     name: str
+    name_local: Optional[str] = None
     type: str
     lat: float
     lng: float
@@ -124,6 +127,11 @@ class ShelterResponse(BaseModel):
     contact_phone: Optional[str] = None
     contact_name: Optional[str] = None
     accessibility: str = "partial"
+    address: Optional[str] = None
+    operating_hours: Optional[str] = None
+    elevation_m: Optional[int] = None
+    verified_by: Optional[str] = None
+    last_verified: Optional[str] = None
     distance: Optional[int] = None
     walking_time: Optional[int] = None
 
@@ -203,7 +211,11 @@ class DashboardKPIs(BaseModel):
     shelter_capacity_total: int = 0
     active_reports: int = 0
     alerts_sent_today: int = 0
+    wards_monitored: int = 22
+    active_data_points: int = 176
     last_updated: datetime
+    data_source: str = "Nirvana Risk Engine + Open-Meteo"
+    is_demonstration: bool = True
 
 
 # ============================================================================

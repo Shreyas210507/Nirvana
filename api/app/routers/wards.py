@@ -1,6 +1,4 @@
-"""Ward endpoints — list, detail, search."""
-
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from typing import Optional, List
 from app.models import WardResponse
 from app.mock_data import HYDERABAD_WARDS
@@ -28,4 +26,4 @@ async def get_ward(ward_id: str):
     for w in HYDERABAD_WARDS:
         if w.id == ward_id:
             return WardResponse(**w.model_dump())
-    return {"error": "Ward not found"}
+    raise HTTPException(status_code=404, detail=f"Ward with ID '{ward_id}' not found")

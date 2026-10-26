@@ -10,6 +10,8 @@ import { searchLocations } from '@/lib/location-service';
 import { useI18n } from '@/lib/i18n-context';
 import { LanguageSelector } from '@/components/ui';
 import { LogOut, User as UserIcon, Shield, LogIn, ChevronDown } from 'lucide-react';
+import { fetchDashboardKPIs } from '@/lib/nirvana-api';
+import type { DashboardKPIs } from '@/lib/types';
 
 // ============================================================================
 // RAIN PARTICLE EFFECT
@@ -56,7 +58,8 @@ function AnimatedCounter({ value, suffix = '', duration = 2000 }: { value: numbe
     requestAnimationFrame(animate);
   }, [isInView, value, duration]);
 
-  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
+  const displaySuffix = value === 0 ? '' : suffix;
+  return <span ref={ref}>{count.toLocaleString()}{displaySuffix}</span>;
 }
 
 // ============================================================================
@@ -140,6 +143,13 @@ export default function LandingPage() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
+
+  useEffect(() => {
+    fetchDashboardKPIs()
+      .then((data) => setKpis(data))
+      .catch((err) => console.warn('Could not load KPIs for landing:', err));
+  }, []);
 
   const handleUseLocation = async () => {
     setGeoError(null);
@@ -319,7 +329,7 @@ export default function LandingPage() {
             >
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-risk-severe/10 text-risk-severe border border-risk-severe/20 text-sm font-semibold mb-6 severe-breathing">
                 <span className="w-2 h-2 rounded-full bg-risk-severe animate-pulse" />
-                <span>3 {t('landing.statsHighRiskWards')}</span>
+                <span>{kpis ? (kpis.wardsAtHigh + kpis.wardsAtSevere) : 3} {t('landing.statsHighRiskWards')}</span>
               </div>
             </motion.div>
 
@@ -438,29 +448,44 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-y md:divide-y-0 md:divide-x divide-sand-200/80">
             <div className="pt-2 md:pt-0">
               <div className="text-3xl lg:text-4xl font-extrabold text-ink font-display">
-                <AnimatedCounter value={22} />
+                <AnimatedCounter value={kpis?.wardsMonitored ?? 22} />
               </div>
               <p className="text-sm font-medium text-ink-500 mt-1">{t('landing.statsWardsMonitored')}</p>
             </div>
             <div className="pt-2 md:pt-0">
               <div className="text-3xl lg:text-4xl font-extrabold text-risk-severe font-display">
-                <AnimatedCounter value={3} />
+                <AnimatedCounter value={kpis ? (kpis.wardsAtHigh + kpis.wardsAtSevere) : 3} />
               </div>
               <p className="text-sm font-medium text-ink-500 mt-1">{t('landing.statsHighRiskWards')}</p>
             </div>
             <div className="pt-2 md:pt-0">
               <div className="text-3xl lg:text-4xl font-extrabold text-teal-600 font-display">
-                <AnimatedCounter value={10} />
+                <AnimatedCounter value={kpis?.sheltersOpen ?? 10} />
               </div>
               <p className="text-sm font-medium text-ink-500 mt-1">{t('landing.statsOpenShelters')}</p>
             </div>
             <div className="pt-2 md:pt-0">
               <div className="text-3xl lg:text-4xl font-extrabold text-saffron font-display">
-                <AnimatedCounter value={285} suffix="K" />
+                <AnimatedCounter value={kpis?.activeDataPoints ?? 176} />
               </div>
               <p className="text-sm font-medium text-ink-500 mt-1">{t('landing.liveSensorData')}</p>
             </div>
           </div>
+          {kpis && (
+            <div className="mt-4 pt-3 border-t border-sand-100 flex flex-wrap items-center justify-center gap-3 text-xs text-ink-400">
+              <span>Source: <strong className="text-ink-600">{kpis.dataSource}</strong></span>
+              <span>•</span>
+              <span>Updated: {kpis.lastUpdated ? `${kpis.lastUpdated.slice(11, 16)} UTC` : 'Recent'}</span>
+              {kpis.isDemonstration && (
+                <>
+                  <span>•</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold tracking-wide">
+                    PILOT DEMONSTRATION BASELINE
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </section>
 

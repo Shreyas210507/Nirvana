@@ -22,11 +22,16 @@ export interface LocationTerrainProfile {
 }
 
 /**
+/**
  * Resolves local terrain profile for given coordinates:
- * Checks closest Hyderabad ward within 5km for exact civic survey metrics;
- * otherwise derives terrain characteristics for custom locations.
+ * Checks closest Hyderabad ward within 6km for exact civic survey metrics;
+ * otherwise derives terrain characteristics for custom locations using live forecast elevation.
  */
-export function resolveLocationTerrain(lat: number, lng: number): LocationTerrainProfile {
+export function resolveLocationTerrain(
+  lat: number,
+  lng: number,
+  forecast?: WeatherForecast | null
+): LocationTerrainProfile {
   let closestWard: (typeof hyderabadWards)[0] | null = null;
   let minDistance = Infinity;
 
@@ -57,17 +62,29 @@ export function resolveLocationTerrain(lat: number, lng: number): LocationTerrai
     };
   }
 
-  // Derive reasonable terrain profile for custom locations outside pilot wards
-  // Regional elevation baseline around Deccan plateau / urban plains
-  const baseElev = 525 + Math.round((Math.sin(lat * 10) + Math.cos(lng * 10)) * 18);
+  // Derive realistic terrain profile for locations outside pilot wards
+  let elevation = 25; // Default lowland baseline
+  if (forecast?.elevation !== undefined && forecast.elevation !== null) {
+    elevation = Math.round(forecast.elevation);
+  } else if (lat >= 15.8 && lat <= 19.9 && lng >= 77.2 && lng <= 81.8) {
+    // Deccan Plateau / Telangana region
+    elevation = 525 + Math.round((Math.sin(lat * 10) + Math.cos(lng * 10)) * 18);
+  } else if (lat >= 50 && lat <= 58 && lng >= -6 && lng <= 2) {
+    // UK / London Thames Valley
+    elevation = 25;
+  } else {
+    // General urban elevation model
+    elevation = Math.max(8, Math.min(650, Math.round(30 + Math.abs(Math.sin(lat) * 120))));
+  }
+
   return {
-    elevation: Math.max(480, Math.min(590, baseElev)),
-    drainageCondition: 'partial',
-    imperviousFraction: 0.72,
-    greenCoverFraction: 0.12,
-    historicalFloodFrequency: 4,
-    historicalHeatwaveDays: 14,
-    outdoorWorkerFraction: 0.28,
+    elevation,
+    drainageCondition: 'good',
+    imperviousFraction: 0.65,
+    greenCoverFraction: 0.22,
+    historicalFloodFrequency: 2,
+    historicalHeatwaveDays: 5,
+    outdoorWorkerFraction: 0.14,
   };
 }
 
@@ -80,7 +97,7 @@ export function computeLocationRisk(
   forecast: WeatherForecast | null,
   horizon: Horizon = 'now'
 ): WardRisk {
-  const terrain = resolveLocationTerrain(location.latitude, location.longitude);
+  const terrain = resolveLocationTerrain(location.latitude, location.longitude, forecast);
 
   // 1. Extract live rainfall metrics
   const currentRain = forecast?.current?.rainfall ?? 0;
@@ -88,7 +105,6 @@ export function computeLocationRisk(
   let next24hRain = 0;
 
   if (forecast?.hourly && forecast.hourly.length > 0) {
-    // Horizon index offset
     const offset = horizon === '6h' ? 6 : horizon === '24h' ? 24 : horizon === '72h' ? 48 : 0;
     const slice3 = forecast.hourly.slice(offset, offset + 3);
     next3hRain = slice3.reduce((sum, h) => sum + (h.rainfall || 0), 0);
@@ -101,7 +117,7 @@ export function computeLocationRisk(
   }
 
   // 2. Extract live temperature & heat index metrics
-  const currentTemp = forecast?.current?.temperature ?? 32;
+  const currentTemp = forecast?.current?.temperature ?? 24;
   const currentHeatIndex = forecast?.current?.heatIndex ?? currentTemp;
   const maxTemp24h = forecast?.daily?.[0]?.tempMax ?? currentTemp;
   const maxHeatIndex24h = forecast?.daily?.[0]?.heatIndexMax ?? currentHeatIndex;
@@ -109,23 +125,29 @@ export function computeLocationRisk(
   // --------------------------------------------------------------------------
   // FLOOD RISK COMPUTATION
   // --------------------------------------------------------------------------
-  // Rainfall weight: 0.35, Elevation weight: 0.25, Drainage: 0.20, Impervious/History: 0.20
-  let floodScore = 15; // baseline
+  let floodScore = 10; // baseline
 
   // Rain component
   if (next3hRain > 50 || currentRain > 25) {
-    floodScore += 50;
+    floodScore += 55;
   } else if (next3hRain > 25 || currentRain > 12) {
-    floodScore += 38;
+    floodScore += 40;
   } else if (next3hRain > 10 || currentRain > 4) {
-    floodScore += 24;
+    floodScore += 25;
   } else if (next3hRain > 2 || currentRain > 0.5) {
     floodScore += 12;
   }
 
-  // Elevation component (Regional average ~540m; lower elevation increases pooling)
-  const elevDeficit = Math.max(0, 540 - terrain.elevation);
-  floodScore += Math.min(25, Math.round((elevDeficit / 35) * 22));
+  // Elevation component (evaluated relative to local floodplains)
+  if (terrain.matchedWardId) {
+    const elevDeficit = Math.max(0, 540 - terrain.elevation);
+    floodScore += Math.min(20, Math.round((elevDeficit / 35) * 18));
+  } else {
+    // For non-Hyderabad areas, lower elevation (< 20m) only increases score if precipitation is present
+    if (terrain.elevation < 20 && next3hRain > 5) {
+      floodScore += 10;
+    }
+  }
 
   // Drainage component
   if (terrain.drainageCondition === 'poor') {
@@ -133,22 +155,26 @@ export function computeLocationRisk(
   } else if (terrain.drainageCondition === 'partial') {
     floodScore += 8;
   } else {
-    floodScore -= 5;
+    floodScore -= 4;
   }
 
   // Impervious surface & history
-  floodScore += Math.round(terrain.imperviousFraction * 10);
-  floodScore += Math.min(10, Math.round(terrain.historicalFloodFrequency * 0.9));
+  floodScore += Math.round(terrain.imperviousFraction * 8);
+  floodScore += Math.min(8, Math.round(terrain.historicalFloodFrequency * 0.8));
 
   // Clamp 0-100
-  floodScore = Math.max(8, Math.min(96, floodScore));
+  floodScore = Math.max(5, Math.min(96, floodScore));
 
   const floodLevel: RiskLevel =
-    floodScore >= 75 ? 'severe' : floodScore >= 52 ? 'high' : floodScore >= 32 ? 'moderate' : 'low';
+    floodScore >= 75 ? 'severe' : floodScore >= 50 ? 'high' : floodScore >= 28 ? 'moderate' : 'low';
 
-  const rainContribution = Math.min(1, Math.max(0.15, next3hRain / 50));
-  const elevContribution = Math.min(1, Math.max(0.1, (550 - terrain.elevation) / 45));
+  const rainContribution = Math.min(1, Math.max(0.12, next3hRain / 50));
+  const elevContribution = terrain.matchedWardId
+    ? Math.min(1, Math.max(0.1, (545 - terrain.elevation) / 45))
+    : Math.min(1, Math.max(0.1, (next3hRain > 2 ? 0.35 : 0.1)));
   const drainContribution = terrain.drainageCondition === 'poor' ? 0.8 : terrain.drainageCondition === 'partial' ? 0.45 : 0.18;
+
+  const isMusiWard = terrain.matchedWardId && ['w-001', 'w-002', 'w-003', 'w-004'].includes(terrain.matchedWardId);
 
   const floodFactors: RiskFactor[] = [
     {
@@ -162,46 +188,51 @@ export function computeLocationRisk(
           ? `Moderate-heavy rain: ${next3hRain.toFixed(1)}mm rain expected in next 3h`
           : next3hRain > 2
           ? `Light rain showers: ${next3hRain.toFixed(1)}mm expected in next 3h`
-          : `Dry conditions: ${next3hRain.toFixed(1)}mm rainfall expected in next 3 hours`,
+          : `${next3hRain.toFixed(1)}mm rain expected in next 3h`,
     },
     {
-      name: 'Elevation ASL',
+      name: 'Elevation',
       contribution: Number(elevContribution.toFixed(2)),
       value: `${terrain.elevation.toFixed(0)}m ASL`,
-      description:
-        terrain.elevation <= 512
-          ? `Low-lying depression (${terrain.elevation}m ASL) prone to rapid surface water accumulation`
-          : terrain.elevation <= 535
-          ? `Moderate elevation (${terrain.elevation}m ASL) with moderate natural drainage gradient`
-          : `High plateau elevation (${terrain.elevation}m ASL) well above primary floodplains`,
+      description: isMusiWard
+        ? 'Low-lying area near Musi river'
+        : terrain.matchedWardName
+        ? terrain.elevation <= 512
+          ? `Low-lying river corridor (${terrain.elevation}m ASL) prone to surface accumulation`
+          : `Moderate elevation (${terrain.elevation}m ASL) with steady natural drainage`
+        : terrain.elevation <= 30
+        ? `Lowland river basin topography (${terrain.elevation}m ASL) with gentle drainage gradient`
+        : terrain.elevation <= 120
+        ? `Moderate urban elevation (${terrain.elevation}m ASL) above primary flood channels`
+        : `Elevated topography (${terrain.elevation}m ASL) with rapid surface runoff`,
     },
     {
       name: 'Drainage Condition',
       contribution: Number(drainContribution.toFixed(2)),
       value:
         terrain.drainageCondition === 'poor'
-          ? 'Poor (Restricted)'
+          ? 'Poor'
           : terrain.drainageCondition === 'good'
-          ? 'Good (High Flow)'
-          : 'Partial Capacity',
+          ? 'Good'
+          : 'Partial',
       description:
         terrain.drainageCondition === 'poor'
-          ? 'Stormwater nalas have restricted outflow and frequent siltation'
+          ? 'Drain blocked nearby'
           : terrain.drainageCondition === 'good'
-          ? 'Clear concrete stormwater drains capable of handling high runoff'
-          : 'Moderate stormwater capacity with potential local backflow during surges',
-    },
-    {
-      name: 'Impervious Surface',
-      contribution: Number((terrain.imperviousFraction * 0.5).toFixed(2)),
-      value: `${Math.round(terrain.imperviousFraction * 100)}% paved`,
-      description: `${Math.round(terrain.imperviousFraction * 100)}% paved/built area impedes ground infiltration`,
+          ? 'Drain clear with high flow'
+          : 'Drain partially clear',
     },
     {
       name: 'Historical Flooding',
       contribution: Number((Math.min(0.65, terrain.historicalFloodFrequency / 12)).toFixed(2)),
-      value: `${terrain.historicalFloodFrequency} recorded events`,
-      description: `Locality experienced ${terrain.historicalFloodFrequency} waterlogging incidents in recent seasons`,
+      value: `${terrain.historicalFloodFrequency} events`,
+      description: `Area has flooded ${terrain.historicalFloodFrequency} times in 5 years`,
+    },
+    {
+      name: 'Impervious Surface',
+      contribution: Number((terrain.imperviousFraction * 0.45).toFixed(2)),
+      value: `${Math.round(terrain.imperviousFraction * 100)}%`,
+      description: `${Math.round(terrain.imperviousFraction * 100)}% concrete/paved surface`,
     },
   ];
 
@@ -263,7 +294,7 @@ export function computeLocationRisk(
     },
   ];
 
-  const nowIso = new Date().toISOString();
+  const nowIso = forecast?.lastUpdated || '2026-10-26T00:00:00.000Z';
 
   const floodRiskScore: RiskScore = {
     hazard: 'flood',

@@ -1,6 +1,6 @@
 """Shelter endpoints — list, nearest, get by ID."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from typing import Optional, List
 from math import radians, cos, sin, asin, sqrt
 from app.models import ShelterResponse
@@ -75,7 +75,7 @@ async def nearest_shelter(
         res.distance = int(best_dist)
         res.walking_time = max(1, int(best_dist / 80))
         return res
-    return {"error": "No shelters found"}
+    raise HTTPException(status_code=404, detail="No shelters found")
 
 
 @router.get("/{shelter_id}", response_model=ShelterResponse)
@@ -84,4 +84,4 @@ async def get_shelter(shelter_id: str):
     for s in SHELTERS:
         if s.id == shelter_id:
             return s
-    return {"error": "Shelter not found"}
+    raise HTTPException(status_code=404, detail=f"Shelter with ID '{shelter_id}' not found")

@@ -52,6 +52,7 @@ export interface WardRisk {
 export interface WeatherForecast {
   lat: number;
   lng: number;
+  elevation?: number;
   current: WeatherSnapshot;
   hourly: WeatherSnapshot[];
   daily: DailyForecast[];
@@ -115,7 +116,7 @@ export interface DrainageSegment {
 
 // Shelter Types
 export type ShelterType = 'school' | 'community_hall' | 'relief_camp' | 'cooling_centre' | 'hospital' | 'place_of_worship' | 'other';
-export type VerificationStatus = 'verified_municipality' | 'verified_volunteer' | 'community_submitted' | 'unverified';
+export type VerificationStatus = 'verified_municipality' | 'verified_volunteer' | 'community_submitted' | 'unverified' | 'illustrative_demo';
 
 export interface Shelter {
   id: string;
@@ -236,7 +237,11 @@ export interface DashboardKPIs {
   shelterCapacityTotal: number;
   activeReports: number;
   alertsSentToday: number;
+  wardsMonitored?: number;
+  activeDataPoints?: number;
   lastUpdated: string;
+  dataSource?: string;
+  isDemonstration?: boolean;
 }
 
 // Data Source Status

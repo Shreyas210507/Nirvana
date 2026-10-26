@@ -67,6 +67,7 @@ const DEFAULT_ZOOM = Number(process.env.NEXT_PUBLIC_MAP_ZOOM) || 11.5;
 
 interface InteractiveMapProps {
   wardRisks?: WardRisk[];
+  reports?: CommunityReport[];
   activeLayers?: Set<string>;
   selectedWard?: string | null;
   onWardSelect?: (wardId: string | null) => void;
@@ -80,6 +81,7 @@ interface InteractiveMapProps {
 
 export function InteractiveMap({
   wardRisks = [],
+  reports,
   activeLayers = new Set(['flood', 'shelters', 'wards']),
   selectedWard = null,
   onWardSelect,
@@ -497,8 +499,8 @@ export function InteractiveMap({
       const popup = new maplibregl.Popup({ offset: 15, maxWidth: '280px' }).setHTML(`
         <div style="font-size: 12px; line-height: 1.4;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-            <span style="background: #CCFBF1; color: #0F766E; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 10px;">
-              ${shelter.verificationStatus.includes('verified') ? '🛡️ Verified' : 'Community'}
+            <span style="background: ${shelter.verificationStatus === 'illustrative_demo' ? '#FEF3C7' : shelter.verificationStatus.includes('verified') ? '#CCFBF1' : '#F1F5F9'}; color: ${shelter.verificationStatus === 'illustrative_demo' ? '#D97706' : shelter.verificationStatus.includes('verified') ? '#0F766E' : '#475569'}; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 10px;">
+              ${shelter.verificationStatus === 'illustrative_demo' ? '⚠️ Demo Shelter' : shelter.verificationStatus.includes('verified') ? '🛡️ Verified' : 'Community'}
             </span>
             <span style="font-size: 10px; color: #64748B; text-transform: capitalize;">${shelter.type.replace('_', ' ')}</span>
           </div>
@@ -534,7 +536,9 @@ export function InteractiveMap({
 
     if (!activeLayers.has('reports')) return;
 
-    mockReports.forEach((report) => {
+    const reportsToRender = reports && reports.length > 0 ? reports : mockReports;
+
+    reportsToRender.forEach((report) => {
       const el = document.createElement('div');
       el.className = 'report-map-marker';
       const bgColor =
@@ -583,7 +587,7 @@ export function InteractiveMap({
 
       reportMarkersRef.current.push(marker);
     });
-  }, [activeLayers, mapLoaded]);
+  }, [activeLayers, mapLoaded, reports]);
 
   // ==========================================================================
   // GPS TRIGGER HANDLER
