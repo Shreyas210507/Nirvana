@@ -11,6 +11,8 @@ import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n-context';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { LogOut } from 'lucide-react';
+import { InteractiveMap } from '@/components/map/interactive-map';
+
 
 // ============================================================================
 // SIDEBAR NAV
@@ -801,23 +803,51 @@ export default function MunicipalDashboard() {
             </div>
           )}
 
-          {/* Placeholder for other tabs */}
-          {['map', 'resources'].includes(activeTab) && (
-            <div className="flex items-center justify-center py-20">
-              <div className="text-center">
-                <span className="text-5xl block mb-4">🚧</span>
-                <h2 className="text-xl font-semibold text-ink mb-2 font-display">
-                  {activeTab === 'map' ? 'Live Risk Map' : 'Resource Planning'}
-                </h2>
-                <p className="text-sm text-ink-400">
-                  Full {activeTab === 'map' ? 'MapLibre GL interactive map' : 'resource management with drag-and-drop'} view coming in next build phase
-                </p>
-                <Link href="/map" className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-teal text-white text-sm font-semibold hover:bg-teal-600 transition-colors">
-                  {activeTab === 'map' ? '🗺️ Open Full Map' : '📋 View Overview'}
+          {/* Live Map Tab */}
+          {activeTab === 'map' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-ink font-display">Municipal GIS Operations & Surveillance Map</h2>
+                  <p className="text-xs text-ink-400">Live spatial monitoring of flood and heat hazards, verified shelters, and community reports</p>
+                </div>
+                <Link
+                  href="/map"
+                  className="px-3.5 py-1.5 rounded-xl bg-teal text-white text-xs font-semibold hover:bg-teal-600 transition-colors flex items-center gap-1.5 shadow-soft"
+                >
+                  <span>🗺️ Full Screen Map</span>
                 </Link>
+              </div>
+              <div className="h-[620px] w-full rounded-2xl overflow-hidden border border-sand-200 shadow-soft">
+                <InteractiveMap
+                  wardRisks={wardRisks}
+                  hazardView={hazardView}
+                  activeLayers={new Set(['flood', 'heat', 'shelters', 'reports', 'wards'])}
+                  className="w-full h-full"
+                />
               </div>
             </div>
           )}
+
+          {/* Resources Tab Placeholder */}
+          {activeTab === 'resources' && (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <span className="text-5xl block mb-4">🚒</span>
+                <h2 className="text-xl font-semibold text-ink mb-2 font-display">Resource Planning & Dispatch</h2>
+                <p className="text-sm text-ink-400">
+                  Municipal resource dispatch and emergency shelter capacity planning tools
+                </p>
+                <button
+                  onClick={() => setActiveTab('overview')}
+                  className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-sand-100 text-ink-600 text-sm font-semibold hover:bg-sand-200 transition-colors"
+                >
+                  📋 Back to Command Overview
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       </main>
 

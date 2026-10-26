@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Telugu:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&family=Noto+Sans+Kannada:wght@400;500;600;700&family=Noto+Sans+Malayalam:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Sans+Gujarati:wght@400;500;600;700&family=Noto+Sans+Oriya:wght@400;500;600;700&family=Noto+Sans+Gurmukhi:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap');
 @import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
 
 /* Right-To-Left language support (Urdu) */
 [dir="rtl"] {
@@ -298,11 +300,100 @@ body {
   border: 1px solid #E2E8F0 !important;
   border-radius: 0.75rem !important;
   box-shadow: 0 10px 25px -3px rgba(15, 23, 42, 0.1) !important;
-  padding: 1rem !important;
+  padding: 0.875rem !important;
   font-family: 'Inter', sans-serif !important;
   color: #0F172A !important;
 }
 .maplibregl-popup-tip { border-top-color: #FFFFFF !important; }
+
+/* GPS Pulse Marker */
+.gps-pulse-marker {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.gps-pulse-dot {
+  width: 14px;
+  height: 14px;
+  background-color: #0D9488;
+  border: 2.5px solid #FFFFFF;
+  border-radius: 50%;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 0 10px rgba(13, 148, 136, 0.7);
+}
+.gps-pulse-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: rgba(13, 148, 136, 0.4);
+  animation: gpsRadar 2s infinite ease-out;
+  z-index: 1;
+}
+@keyframes gpsRadar {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+
+/* Selected Location Marker */
+.selected-loc-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 4px 6px rgba(15, 23, 42, 0.3));
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.selected-loc-pin:hover {
+  transform: scale(1.15) translateY(-2px);
+}
+
+/* Shelter and Report Pins */
+.shelter-map-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 2px solid #0D9488;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  font-size: 16px;
+}
+.shelter-map-marker:hover {
+  transform: scale(1.22);
+  z-index: 20;
+}
+
+.report-map-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.25);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  font-size: 14px;
+}
+.report-map-marker:hover {
+  transform: scale(1.22);
+  z-index: 20;
+}
+
 
 /* Toast Animations */
 .toast-enter { animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }

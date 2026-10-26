@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { ShelterCard, LanguageSelector } from '@/components/ui';
 import { hyderabadShelters } from '@/lib/mock-data';
 import { useI18n } from '@/lib/i18n-context';
+import { InteractiveMap } from '@/components/map/interactive-map';
+
 
 export default function SheltersPage() {
   const { t } = useI18n();
@@ -81,19 +83,29 @@ export default function SheltersPage() {
           {t('shelters.verifiedOnly')}
         </label>
 
-        {/* Shelter List */}
-        <div className="space-y-3">
-          {filteredShelters.map((shelter, i) => (
-            <motion.div
-              key={shelter.id}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <ShelterCard shelter={shelter} />
-            </motion.div>
-          ))}
-        </div>
+        {/* Shelter List or Map View */}
+        {view === 'map' ? (
+          <div className="h-[520px] w-full rounded-2xl overflow-hidden border border-sand-200 shadow-soft">
+            <InteractiveMap
+              activeLayers={new Set(['shelters'])}
+              className="w-full h-full"
+            />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredShelters.map((shelter, i) => (
+              <motion.div
+                key={shelter.id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <ShelterCard shelter={shelter} />
+              </motion.div>
+            ))}
+          </div>
+        )}
+
 
         {filteredShelters.length === 0 && (
           <div className="text-center py-12">
