@@ -1,18 +1,62 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { AlertCard, LanguageSelector } from '@/components/ui';
 import { mockAlerts } from '@/lib/mock-data';
 import { useI18n } from '@/lib/i18n-context';
+import { useLocation } from '@/lib/location-context';
+import { evaluateDynamicAlerts } from '@/lib/alert-service';
+import { computeLocationRisk } from '@/lib/risk-service';
+import { fetchWeatherForecast } from '@/lib/weather-service';
+import { LocationModal } from '@/components/ui/location-modal';
+import type { WeatherForecast, Alert } from '@/lib/types';
+import { MapPin, RefreshCw } from 'lucide-react';
 
 export default function AlertsPage() {
   const { t, speak } = useI18n();
+  const { currentLocation } = useLocation();
   const [filter, setFilter] = useState<'active' | 'upcoming' | 'history'>('active');
+  const [forecast, setForecast] = useState<WeatherForecast | null>(null);
+  const [loadingWeather, setLoadingWeather] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
-  const activeAlerts = mockAlerts.filter(a => a.isActive);
-  const pastAlerts = mockAlerts.filter(a => !a.isActive);
+  // Fetch live weather for current location
+  useEffect(() => {
+    if (!currentLocation) return;
+    const controller = new AbortController();
+    setLoadingWeather(true);
+
+    fetchWeatherForecast(currentLocation.latitude, currentLocation.longitude, {
+      signal: controller.signal,
+    })
+      .then((res) => {
+        setForecast(res.forecast);
+        setLoadingWeather(false);
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
+        setLoadingWeather(false);
+      });
+
+    return () => controller.abort();
+  }, [currentLocation]);
+
+  // Compute reactive risk & evaluate dynamic alerts for current location
+  const dynamicRisk = useMemo(() => {
+    if (!currentLocation) return null;
+    return computeLocationRisk(currentLocation, forecast, 'now');
+  }, [currentLocation, forecast]);
+
+  const activeAlerts: Alert[] = useMemo(() => {
+    if (!currentLocation) return [];
+    return evaluateDynamicAlerts(currentLocation, forecast, dynamicRisk);
+  }, [currentLocation, forecast, dynamicRisk]);
+
+  const pastAlerts = useMemo(() => {
+    return mockAlerts.filter((a) => !a.isActive);
+  }, []);
 
   const handleSpeak = (text: string) => {
     speak(text);
@@ -29,7 +73,12 @@ export default function AlertsPage() {
       <nav className="sticky top-0 z-50 bg-cream-100/90 backdrop-blur-xl border-b border-sand-200/50 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="w-8 h-8 rounded-full bg-sand-100 flex items-center justify-center hover:bg-sand-200 transition-colors">←</Link>
+            <Link
+              href="/dashboard"
+              className="w-8 h-8 rounded-full bg-sand-100 flex items-center justify-center hover:bg-sand-200 transition-colors"
+            >
+              ←
+            </Link>
             <h1 className="font-bold text-ink font-display">{t('alerts.title')}</h1>
           </div>
           <LanguageSelector variant="dropdown" className="text-xs" />
@@ -37,9 +86,30 @@ export default function AlertsPage() {
       </nav>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
+        {/* Dynamic Location Banner */}
+        <div className="flex items-center justify-between p-3 rounded-2xl bg-white border border-sand-200 shadow-soft">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-risk-severe/10 flex items-center justify-center text-risk-severe shrink-0">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] text-ink-400 font-medium">Monitoring warnings for</p>
+              <p className="text-sm font-semibold text-ink truncate leading-tight">
+                {currentLocation?.name || 'Selected Location'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsLocationModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-sand-100 hover:bg-sand-200 text-xs font-medium text-ink transition-colors shrink-0"
+          >
+            Change
+          </button>
+        </div>
+
         {/* Filter tabs */}
         <div className="inline-flex bg-sand-100 rounded-full p-1 w-full">
-          {filterTabs.map(tab => (
+          {filterTabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setFilter(tab.key)}
@@ -61,13 +131,15 @@ export default function AlertsPage() {
         {filter === 'active' && (
           <div className="space-y-3">
             {activeAlerts.length === 0 ? (
-              <div className="text-center py-12">
+              <div className="text-center py-12 bg-white rounded-2xl border border-sand-200 p-6 shadow-soft">
                 <span className="text-4xl block mb-3">✅</span>
-                <p className="text-ink-400 font-medium">{t('alerts.noActiveAlerts')}</p>
-                <p className="text-xs text-ink-300 mt-1">{t('alerts.staySafe')}</p>
+                <p className="text-ink font-semibold">{t('alerts.noActiveAlerts')}</p>
+                <p className="text-xs text-ink-400 mt-1">
+                  Conditions are currently within safe thresholds for {currentLocation?.name}.
+                </p>
               </div>
             ) : (
-              activeAlerts.map(alert => (
+              activeAlerts.map((alert) => (
                 <AlertCard
                   key={alert.id}
                   alert={alert}
@@ -84,23 +156,35 @@ export default function AlertsPage() {
         )}
 
         {filter === 'upcoming' && (
-          <div className="text-center py-12">
+          <div className="text-center py-12 bg-white rounded-2xl border border-sand-200 p-6 shadow-soft">
             <span className="text-4xl block mb-3">🔮</span>
-            <p className="text-ink-400 font-medium">{t('alerts.noUpcomingAlerts')}</p>
-            <p className="text-xs text-ink-300 mt-1">{t('alerts.forecastMonitoring')}</p>
+            <p className="text-ink font-semibold">{t('alerts.noUpcomingAlerts')}</p>
+            <p className="text-xs text-ink-400 mt-1">{t('alerts.forecastMonitoring')}</p>
           </div>
         )}
 
         {filter === 'history' && (
           <div className="space-y-3">
-            <div className="text-center py-8">
-              <span className="text-4xl block mb-3">📚</span>
-              <p className="text-ink-400 font-medium">{t('alerts.pastAlertsNotice')}</p>
-              <p className="text-xs text-ink-300 mt-1">{t('alerts.history')}</p>
+            <div className="text-center py-4 bg-sand-50 rounded-2xl border border-sand-200 p-3">
+              <span className="text-xl block mb-1">📚</span>
+              <p className="text-xs text-ink-500 font-medium">{t('alerts.pastAlertsNotice')}</p>
             </div>
+            {pastAlerts.map((alert) => (
+              <AlertCard
+                key={alert.id}
+                alert={alert}
+                compact
+                onListen={() => handleSpeak(alert.message)}
+              />
+            ))}
           </div>
         )}
       </div>
+
+      <LocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+      />
 
       {/* Bottom Nav */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-sand-200 z-40">
@@ -111,8 +195,14 @@ export default function AlertsPage() {
             { href: '/alerts', icon: '🔔', label: t('nav.alerts'), active: true },
             { href: '/guide', icon: '📖', label: t('nav.guide'), active: false },
             { href: '/settings', icon: '👤', label: t('nav.settings'), active: false },
-          ].map(item => (
-            <Link key={item.href} href={item.href} className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-colors ${item.active ? 'text-teal' : 'text-ink-400'}`}>
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-colors ${
+                item.active ? 'text-teal' : 'text-ink-400'
+              }`}
+            >
               <span className="text-xl">{item.icon}</span>
               <span className="text-[10px] font-medium">{item.label}</span>
             </Link>

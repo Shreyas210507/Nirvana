@@ -12,6 +12,7 @@ import { getRiskColor } from '@/lib/utils';
 import type { WardRisk, Shelter, CommunityReport } from '@/lib/types';
 import { useLocation } from '@/lib/location-context';
 import { searchLocations, LocationData } from '@/lib/location-service';
+import { computeNearbyShelters } from '@/lib/shelter-service';
 import {
   Crosshair,
   Compass,
@@ -465,7 +466,11 @@ export function InteractiveMap({
 
     if (!activeLayers.has('shelters')) return;
 
-    hyderabadShelters.forEach((shelter) => {
+    const sheltersToDisplay = currentLocation
+      ? computeNearbyShelters(currentLocation.latitude, currentLocation.longitude, currentLocation.name)
+      : hyderabadShelters;
+
+    sheltersToDisplay.forEach((shelter) => {
       const el = document.createElement('div');
       el.className = 'shelter-map-marker';
       const icon =
@@ -482,6 +487,13 @@ export function InteractiveMap({
       el.innerHTML = `<span>${icon}</span>`;
       el.title = `${shelter.name} (${shelter.type})`;
 
+      const distStr = shelter.distance
+        ? shelter.distance < 1000
+          ? `${shelter.distance}m`
+          : `${(shelter.distance / 1000).toFixed(1)} km`
+        : '';
+      const walkStr = shelter.walkingTime ? `~${shelter.walkingTime} min walk` : '';
+
       const popup = new maplibregl.Popup({ offset: 15, maxWidth: '280px' }).setHTML(`
         <div style="font-size: 12px; line-height: 1.4;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
@@ -491,7 +503,8 @@ export function InteractiveMap({
             <span style="font-size: 10px; color: #64748B; text-transform: capitalize;">${shelter.type.replace('_', ' ')}</span>
           </div>
           <strong style="color: #0F172A; font-size: 13px; display: block; margin-bottom: 2px;">${shelter.name}</strong>
-          <span style="color: #64748B; font-size: 11px; display: block; margin-bottom: 6px;">${shelter.address}</span>
+          <span style="color: #64748B; font-size: 11px; display: block; margin-bottom: 4px;">${shelter.address}</span>
+          ${distStr ? `<div style="color: #0F766E; font-size: 11px; font-weight: 600; margin-bottom: 6px;">📍 ${distStr} ${walkStr ? `(${walkStr})` : ''}</div>` : ''}
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 10px; color: #475569; border-top: 1px solid #E2E8F0; padding-top: 6px;">
             <span>👥 Capacity: <strong>${shelter.capacity}</strong></span>
             <span>💧 Safe: <strong>${shelter.floodSafe ? 'Yes' : 'Low'}</strong></span>
@@ -507,7 +520,7 @@ export function InteractiveMap({
 
       shelterMarkersRef.current.push(marker);
     });
-  }, [activeLayers, mapLoaded]);
+  }, [activeLayers, mapLoaded, currentLocation]);
 
   // ==========================================================================
   // RENDER REPORT MARKERS

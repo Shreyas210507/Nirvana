@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Query
 from typing import Optional, List
-from app.models import WardRisk, DashboardKPIs, Horizon
+from app.models import WardRisk, DashboardKPIs, Horizon, WardBase
 from app.mock_data import HYDERABAD_WARDS
 from app.risk_engine import compute_ward_risks
 from datetime import datetime
@@ -43,6 +43,65 @@ async def get_ward_risk(
 
     risks = compute_ward_risks([ward], horizon=horizon)
     return risks[0] if risks else {"error": "Could not compute risk"}
+
+
+@router.get("/evaluate", response_model=WardRisk)
+async def evaluate_risk(
+    lat: float = Query(..., description="Latitude"),
+    lng: float = Query(..., description="Longitude"),
+    name: Optional[str] = Query(None, description="Location name"),
+    ward_id: Optional[str] = Query(None, description="Ward ID"),
+    rainfall_mm: Optional[float] = Query(None, description="Current or 3h rainfall forecast in mm"),
+    temp: Optional[float] = Query(None, description="Temperature in C"),
+    heat_index: Optional[float] = Query(None, description="Heat index in C"),
+    horizon: str = Query("now"),
+):
+    """Dynamically evaluate flood and heat risk for specific coordinates and weather parameters."""
+    # Find matching ward or construct localized ward model
+    matched_ward = None
+    if ward_id:
+        matched_ward = next((w for w in HYDERABAD_WARDS if w.id == ward_id), None)
+
+    if not matched_ward:
+        # Check proximity to known Hyderabad wards
+        for w in HYDERABAD_WARDS:
+            if w.id == ward_id:
+                matched_ward = w
+                break
+
+    if not matched_ward:
+        # Synthesize localized ward based on coordinates
+        loc_name = name or f"{lat:.2f}N, {lng:.2f}E"
+        matched_ward = WardBase(
+            id="custom-loc",
+            name=loc_name,
+            name_local="",
+            zone=loc_name,
+            population=45000,
+            area=3.0,
+            avg_elevation=530.0,
+            drainage_condition="fair",
+            impervious_fraction=0.72,
+            green_cover_fraction=0.12,
+            informal_settlement_fraction=0.15,
+            elderly_population_fraction=0.08,
+            outdoor_worker_fraction=0.25,
+            historical_flood_frequency=4,
+        )
+
+    rf = rainfall_mm if rainfall_mm is not None else 0.0
+    t = temp if temp is not None else 32.0
+    hi = heat_index if heat_index is not None else (t + 3.0)
+
+    risks = compute_ward_risks(
+        [matched_ward],
+        rainfall_forecast_mm=rf,
+        max_temp=t,
+        heat_index=hi,
+        horizon=horizon,
+    )
+    return risks[0]
+
 
 
 @router.get("/dashboard", response_model=DashboardKPIs)

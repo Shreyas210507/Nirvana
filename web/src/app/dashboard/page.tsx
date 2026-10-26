@@ -24,13 +24,16 @@ import {
   emergencyContacts,
   safetyGuidance,
 } from '@/lib/mock-data';
-import type { WardRisk, WeatherForecast } from '@/lib/types';
+import type { WardRisk, WeatherForecast, Horizon } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
 import { useLocation } from '@/lib/location-context';
 import { useI18n } from '@/lib/i18n-context';
 import { LocationModal } from '@/components/ui/location-modal';
 import { fetchWeatherForecast } from '@/lib/weather-service';
-import { validateCoordinates, searchLocations } from '@/lib/location-service';
+import { validateCoordinates, searchLocations, calculateDistanceKm } from '@/lib/location-service';
+import { computeLocationRisk } from '@/lib/risk-service';
+import { computeNearbyShelters, formatShelterDistance } from '@/lib/shelter-service';
+import { evaluateDynamicAlerts } from '@/lib/alert-service';
 import {
   LogIn,
   RefreshCw,
@@ -128,30 +131,63 @@ function MiniTempChart({ data }: { data: { time: string; temperature: number }[]
 }
 
 // ============================================================================
-// WHY IS MY RISK HIGH COMPONENT
+// WHY IS MY RISK HIGH COMPONENT (DYNAMIC RISK REASONING)
 // ============================================================================
 function RiskExplainer({
-  factors,
-  hazard,
+  floodFactors,
+  heatFactors = [],
+  locationName = 'Selected Area',
 }: {
-  factors: Array<{ name: string; contribution: number; description: string; value: string }>;
-  hazard: string;
+  floodFactors: Array<{ name: string; contribution: number; description: string; value: string }>;
+  heatFactors?: Array<{ name: string; contribution: number; description: string; value: string }>;
+  locationName?: string;
 }) {
+  const [activeHazard, setActiveHazard] = useState<'flood' | 'heat'>('flood');
   const [expanded, setExpanded] = useState(false);
+
+  const factors = activeHazard === 'flood' ? floodFactors : heatFactors.length > 0 ? heatFactors : floodFactors;
   const topFactors = expanded ? factors : factors.slice(0, 3);
 
   return (
     <div className="bg-white rounded-2xl border border-sand-200 p-4 shadow-soft">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between mb-3"
-      >
-        <h3 className="font-semibold text-ink text-sm flex items-center gap-2">
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-2 text-left"
+        >
           <span className="text-base">🔍</span>
-          Why is my {hazard} risk this level?
-        </h3>
-        <span className="text-ink-400 text-xs">{expanded ? '▲ Less' : '▼ More'}</span>
-      </button>
+          <h3 className="font-semibold text-ink text-sm">
+            Why is my {activeHazard} risk this level?
+          </h3>
+          <span className="text-ink-400 text-xs ml-1">{expanded ? '▲ Less' : '▼ More'}</span>
+        </button>
+
+        {heatFactors.length > 0 && (
+          <div className="flex bg-sand-100 rounded-full p-0.5 text-[11px] font-medium shrink-0">
+            <button
+              onClick={() => setActiveHazard('flood')}
+              className={`px-2 py-0.5 rounded-full transition-all ${
+                activeHazard === 'flood'
+                  ? 'bg-white text-teal shadow-xs font-semibold'
+                  : 'text-ink-400 hover:text-ink-600'
+              }`}
+            >
+              🌧️ Flood
+            </button>
+            <button
+              onClick={() => setActiveHazard('heat')}
+              className={`px-2 py-0.5 rounded-full transition-all ${
+                activeHazard === 'heat'
+                  ? 'bg-white text-saffron shadow-xs font-semibold'
+                  : 'text-ink-400 hover:text-ink-600'
+              }`}
+            >
+              ☀️ Heat
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="space-y-2.5">
         {topFactors.map((factor, i) => (
           <motion.div
@@ -170,21 +206,23 @@ function RiskExplainer({
                       ? '#EF4444'
                       : factor.contribution > 0.3
                       ? '#F97316'
-                      : '#F59E0B',
+                      : '#0D9488',
                 }}
               />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium text-ink">{factor.name}</span>
-                <span className="text-xs text-ink-400 font-mono shrink-0">{factor.value}</span>
+                <span className="text-xs text-ink-600 font-mono font-semibold shrink-0 bg-sand-100/70 px-1.5 py-0.5 rounded">
+                  {factor.value}
+                </span>
               </div>
-              <p className="text-xs text-ink-400 mt-0.5">{factor.description}</p>
+              <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">{factor.description}</p>
               <div className="w-full h-1 bg-sand-100 rounded-full mt-1.5 overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: `${Math.abs(factor.contribution) * 100}%` }}
-                  transition={{ delay: i * 0.1 + 0.3, duration: 0.5 }}
+                  animate={{ width: `${Math.min(100, Math.max(8, Math.abs(factor.contribution) * 100))}%` }}
+                  transition={{ delay: i * 0.1 + 0.2, duration: 0.5 }}
                   className="h-full rounded-full"
                   style={{
                     backgroundColor:
@@ -192,7 +230,7 @@ function RiskExplainer({
                         ? '#EF4444'
                         : factor.contribution > 0.3
                         ? '#F97316'
-                        : '#F59E0B',
+                        : '#0D9488',
                   }}
                 />
               </div>
@@ -200,8 +238,9 @@ function RiskExplainer({
           </motion.div>
         ))}
       </div>
-      <p className="text-xs text-ink-300 mt-3 flex items-center gap-1">
-        ℹ️ Confidence based on Open-Meteo weather model + terrain sensors. Advisory only.
+      <p className="text-[11px] text-ink-400 mt-3 pt-2.5 border-t border-sand-100 flex items-center justify-between">
+        <span>ℹ️ Dynamic payload fused for {locationName}</span>
+        <span className="font-mono text-[10px]">Open-Meteo + Sensors</span>
       </p>
     </div>
   );
@@ -405,62 +444,72 @@ function CitizenDashboardContent() {
   };
 
   const currentWard =
-    hyderabadWards.find((w) => w.id === userWard) || {
-      id: 'custom',
+    hyderabadWards.find((w) => w.id === (currentLocation?.wardId || userWard)) || {
+      id: currentLocation?.wardId || 'custom',
       name: currentLocation?.name || 'Selected Location',
-      zone: currentLocation?.admin1 || 'Location',
+      zone: currentLocation?.zone || currentLocation?.admin1 || 'Location',
       subdivision: '',
       circle: '',
-      population: 0,
+      population: 48000,
       slumPopulation: 0,
-      areaKm2: 0,
-      elevation: 0,
+      areaKm2: 3.2,
+      elevation: 525,
       drainageCapacityMmHr: 20,
-      vegetationIndex: 0.2,
       imperviousSurfacePct: 60,
-      geometry: { type: 'Feature' as const, geometry: {}, properties: {} },
+      geometry: {
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [currentLocation?.longitude || 78.4867, currentLocation?.latitude || 17.385],
+        },
+        properties: {},
+      },
     };
 
-  const rawRisk = wardRisks.find((w) => w.wardId === userWard);
-  const currentRisk = rawRisk
-    ? {
-        ...rawRisk,
-        flood: {
-          ...rawRisk.flood,
-          level:
-            forecast && forecast.current.rainfall > 15
-              ? ('severe' as const)
-              : forecast && forecast.current.rainfall > 5
-              ? ('high' as const)
-              : rawRisk.flood.level,
-        },
-        heat: {
-          ...rawRisk.heat,
-          level:
-            forecast && forecast.current.heatIndex > 42
-              ? ('severe' as const)
-              : forecast && forecast.current.heatIndex > 38
-              ? ('high' as const)
-              : rawRisk.heat.level,
-        },
-      }
-    : wardRisks[0]
-    ? {
-        ...wardRisks[0],
-        wardId: 'custom',
-        wardName: currentLocation?.name || 'Selected Location',
-      }
-    : undefined;
+  // 1. DYNAMIC RISK REASONING & SCORING:
+  // Re-evaluates instant terrain factors (elevation ASL, drainage condition) and live forecast
+  // metrics (expected rainfall next 3h, heat index) whenever currentLocation, forecast, or horizon changes.
+  const currentRisk = React.useMemo(() => {
+    if (!currentLocation) return undefined;
+    return computeLocationRisk(currentLocation, forecast, selectedHorizon as Horizon);
+  }, [currentLocation, forecast, selectedHorizon]);
 
-  const activeAlerts = mockAlerts.filter((a) => a.isActive && a.wardIds.includes(userWard));
-  const nearbyShelters = hyderabadShelters.slice(0, 3).map((s, i) => ({
-    ...s,
-    distance: [800, 1400, 2200][i] || 1000,
-    walkingTime: [8, 15, 22][i] || 12,
-  }));
-  const nearbyReports = mockReports
-    .filter((r) => r.wardId === userWard || r.wardId === 'w-002')
-    .slice(0, 3);
+  // 2. DYNAMIC NEAREST EMERGENCY SHELTERS:
+  // Computes real Haversine distance (in meters) and accurate walking/driving times relative to active coordinates.
+  const nearbyShelters = React.useMemo(() => {
+    if (!currentLocation) return [];
+    return computeNearbyShelters(
+      currentLocation.latitude,
+      currentLocation.longitude,
+      currentLocation.name,
+      { limit: 3 }
+    );
+  }, [currentLocation]);
+
+  // 3. DYNAMIC WEATHER & RISK WARNINGS:
+  // Re-evaluates title, severity, description, actions, and affected micro-zones whenever active location
+  // or live weather observations change, avoiding hardcoded city/Old City defaults.
+  const activeAlerts = React.useMemo(() => {
+    if (!currentLocation) return [];
+    return evaluateDynamicAlerts(currentLocation, forecast, currentRisk || null);
+  }, [currentLocation, forecast, currentRisk]);
+
+  // Dynamic nearby reports based on proximity to active coordinates
+  const nearbyReports = React.useMemo(() => {
+    if (!currentLocation) return [];
+    return [...mockReports]
+      .map((r) => ({
+        ...r,
+        distanceKm: calculateDistanceKm(
+          currentLocation.latitude,
+          currentLocation.longitude,
+          r.lat,
+          r.lng
+        ),
+      }))
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+      .slice(0, 3);
+  }, [currentLocation]);
 
   const horizons = [
     { value: 'now', label: t('dashboard.now') },
@@ -814,20 +863,27 @@ function CitizenDashboardContent() {
           )}
 
         {/* Nearest Verified Shelter */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold text-ink text-sm flex items-center gap-2">
-              <span>🛡️</span> {t('dashboard.nearestShelters')}
-            </h3>
-            <Link
-              href="/shelters"
-              className="text-xs text-teal font-medium hover:text-teal-600 transition-colors"
-            >
-              {t('common.all')} →
-            </Link>
-          </div>
-          <ShelterCard shelter={nearbyShelters[0]} />
-        </motion.div>
+        {nearbyShelters.length > 0 && nearbyShelters[0] && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-ink text-sm flex items-center gap-1.5">
+                  <span>🛡️</span> {t('dashboard.nearestShelters')}
+                </h3>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">
+                  {formatShelterDistance(nearbyShelters[0].distance)} away • ~{nearbyShelters[0].walkingTime} min walk
+                </span>
+              </div>
+              <Link
+                href="/shelters"
+                className="text-xs text-teal font-medium hover:text-teal-600 transition-colors"
+              >
+                {t('common.all')} →
+              </Link>
+            </div>
+            <ShelterCard shelter={nearbyShelters[0]} />
+          </motion.div>
+        )}
 
         {/* 24-Hour Forecast Chart Card */}
         {forecast && forecast.hourly && forecast.hourly.length > 0 && (
@@ -916,10 +972,14 @@ function CitizenDashboardContent() {
           </motion.div>
         )}
 
-        {/* Risk Explainer */}
+        {/* Risk Explainer (Dynamic Factors & Live Model Binding) */}
         {currentRisk && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <RiskExplainer factors={currentRisk.flood.factors} hazard="flood" />
+            <RiskExplainer
+              floodFactors={currentRisk.flood.factors}
+              heatFactors={currentRisk.heat.factors}
+              locationName={currentLocation?.name}
+            />
           </motion.div>
         )}
 

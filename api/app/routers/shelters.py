@@ -37,33 +37,44 @@ async def list_shelters(
         shelters = [s for s in shelters if "verified" in s.verification_status]
 
     # Calculate distance if user location provided
-    if lat is not None and lng is not None:
-        for s in shelters:
-            dist = _haversine(lat, lng, s.lat, s.lng)
-            s.distance = int(dist)
-            s.walking_time = max(1, int(dist / 80))  # ~80m/min walking speed
-        shelters.sort(key=lambda s: s.distance or 999999)
+    result: List[ShelterResponse] = []
+    for s in shelters:
+        sc = s.model_copy()
+        if lat is not None and lng is not None:
+            dist = _haversine(lat, lng, sc.lat, sc.lng)
+            sc.distance = int(dist)
+            sc.walking_time = max(1, int(dist / 80))  # ~80m/min walking speed
+        result.append(sc)
 
-    return shelters
+    if lat is not None and lng is not None:
+        result.sort(key=lambda s: s.distance if s.distance is not None else 999999)
+
+    return result
 
 
 @router.get("/nearest", response_model=ShelterResponse)
 async def nearest_shelter(
     lat: float = Query(..., description="User latitude"),
     lng: float = Query(..., description="User longitude"),
+    verified_only: bool = Query(True, description="Only search verified shelters"),
 ):
     """Find the nearest verified shelter to a given location."""
+    candidates = [s for s in SHELTERS if ("verified" in s.verification_status)] if verified_only else list(SHELTERS)
+    if not candidates:
+        candidates = list(SHELTERS)
+
     best = None
     best_dist = float("inf")
-    for s in SHELTERS:
+    for s in candidates:
         dist = _haversine(lat, lng, s.lat, s.lng)
         if dist < best_dist:
             best_dist = dist
             best = s
     if best:
-        best.distance = int(best_dist)
-        best.walking_time = max(1, int(best_dist / 80))
-        return best
+        res = best.model_copy()
+        res.distance = int(best_dist)
+        res.walking_time = max(1, int(best_dist / 80))
+        return res
     return {"error": "No shelters found"}
 
 
